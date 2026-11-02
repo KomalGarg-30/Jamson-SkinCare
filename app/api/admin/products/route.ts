@@ -14,6 +14,9 @@ const productSchema = z.object({
   discountPrice: z.number().int().positive().nullable().optional(), sku: z.string().min(2).max(80),
   stock: z.number().int().min(0), featured: z.boolean().default(false), isActive: z.boolean().default(true),
   tags: z.array(z.string().max(40)).max(20).default([]), images: z.array(z.object({ url: z.url(), alt: z.string().max(255) })).max(10).default([]),
+}).refine((data) => data.discountPrice == null || data.discountPrice < data.price, {
+  path: ["discountPrice"],
+  message: "Sale price must be less than the regular price.",
 });
 
 export async function GET(request: Request) {
@@ -62,6 +65,14 @@ export async function PATCH(request: Request) {
     await requireAdmin();
     const body = z.object({ id: z.uuid() }).passthrough().parse(await request.json());
     const data = productSchema.partial().parse(body);
+    const [existing] = await db.select({ price: products.price, discountPrice: products.discountPrice })
+      .from(products).where(eq(products.id, body.id)).limit(1);
+    if (!existing) return NextResponse.json({ error: "Product not found." }, { status: 404 });
+    const price = data.price ?? existing.price;
+    const discountPrice = data.discountPrice === undefined ? existing.discountPrice : data.discountPrice;
+    if (discountPrice !== null && discountPrice >= price) {
+      return NextResponse.json({ error: "Sale price must be less than the regular price." }, { status: 400 });
+    }
     const { images, ...values } = data;
     const product = await db.transaction(async (tx) => {
       const [updated] = await tx.update(products).set({

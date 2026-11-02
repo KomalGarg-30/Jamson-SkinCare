@@ -48,14 +48,20 @@ export function AdminProducts() {
     try {
       const form = event.currentTarget;
       const fields = new FormData(form);
+      const price = Math.round(Number(fields.get("price")) * 100);
+      const discountPrice = fields.get("discountPrice") ? Math.round(Number(fields.get("discountPrice")) * 100) : null;
+      if (discountPrice !== null && discountPrice >= price) {
+        setError("Sale price must be less than the regular price.");
+        return;
+      }
       const images = await uploadFiles(fields.get("images") as FileList | null);
       const body: Record<string, unknown> = {
         name: String(fields.get("name")),
         description: String(fields.get("description")), ingredients: String(fields.get("ingredients") || ""),
         howToUse: String(fields.get("howToUse") || ""), categoryId: String(fields.get("categoryId")),
         brand: String(fields.get("brand")), sku: String(fields.get("sku")),
-        price: Math.round(Number(fields.get("price")) * 100),
-        discountPrice: fields.get("discountPrice") ? Math.round(Number(fields.get("discountPrice")) * 100) : null,
+        price,
+        discountPrice,
         stock: Number(fields.get("stock")), featured: fields.get("featured") === "on",
         isActive: editing?.isActive ?? true, tags: String(fields.get("tags") || "").split(",").map((tag) => tag.trim()).filter(Boolean),
         ...(images.length ? { images } : {}),
@@ -97,9 +103,9 @@ export function AdminProducts() {
       <input className="field" name="slug" placeholder="Product slug (optional)" defaultValue={editing?.slug || ""} />
       <input className="field" name="brand" required placeholder="Brand" defaultValue={editing?.brand || ""} />
       <select className="field" name="categoryId" required defaultValue={editing?.categoryId || ""}><option value="" disabled>Choose category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
-      <input className="field" name="sku" required placeholder="SKU" defaultValue={editing?.sku || ""} />
-      <input className="field" name="price" type="number" min="0.01" step="0.01" required placeholder="Price (₹)" defaultValue={editing ? (editing.price / 100).toFixed(2) : ""} />
-      <input className="field" name="discountPrice" type="number" min="0.01" step="0.01" placeholder="Sale price (₹)" defaultValue={editing?.discountPrice ? (editing.discountPrice / 100).toFixed(2) : ""} />
+      <label className="grid gap-1 text-sm">SKU<input className="field" name="sku" required minLength={2} placeholder="Unique SKU" defaultValue={editing?.sku || ""} /><span className="text-xs text-ink/55">Must be unique for each product.</span></label>
+      <label className="grid gap-1 text-sm">Regular price (₹)<input className="field" name="price" type="number" min="0.01" step="0.01" required placeholder="Regular price" defaultValue={editing ? (editing.price / 100).toFixed(2) : ""} /></label>
+      <label className="grid gap-1 text-sm">Sale price (₹)<input className="field" name="discountPrice" type="number" min="0.01" step="0.01" placeholder="Optional sale price" defaultValue={editing?.discountPrice ? (editing.discountPrice / 100).toFixed(2) : ""} /><span className="text-xs text-ink/55">Must be less than the regular price.</span></label>
       <input className="field" name="stock" type="number" min="0" required placeholder="Stock quantity" defaultValue={editing?.stock ?? 0} />
       <input className="field" name="tags" placeholder="Tags, comma separated" defaultValue={editing?.tags.join(", ") || ""} />
       <textarea className="field sm:col-span-2 lg:col-span-3" name="description" rows={3} minLength={10} required placeholder="Product description" defaultValue={editing?.description || ""} />

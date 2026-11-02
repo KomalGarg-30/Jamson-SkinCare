@@ -10,7 +10,7 @@ export async function GET() {
   try {
     const user = await requireUser();
     const items = await db.select({
-      id: wishlistItems.id, productId: products.id, name: products.name, slug: products.slug,
+      id: products.id, name: products.name, slug: products.slug,
       price: products.price, discountPrice: products.discountPrice, image: productImages.url,
     }).from(wishlistItems).innerJoin(products, eq(wishlistItems.productId, products.id))
       .leftJoin(productImages, eq(productImages.productId, products.id))

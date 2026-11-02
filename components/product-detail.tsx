@@ -19,6 +19,8 @@ export function ProductDetail({ slug }: { slug: string }) {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [image, setImage] = useState("");
+  const [wishlisted, setWishlisted] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
   const [eligibleOrders, setEligibleOrders] = useState<{ id: string; createdAt: string }[]>([]);
   const [reviewError, setReviewError] = useState("");
   const [reviewBusy, setReviewBusy] = useState(false);
@@ -31,6 +33,12 @@ export function ProductDetail({ slug }: { slug: string }) {
     }).then(async (data: Detail) => {
       setDetail(data);
       setImage(data.images[0]?.url || "/images/product-default.svg");
+      setWishlisted(false);
+      void fetch("/api/wishlist").then(async (response) => {
+        if (!response.ok) return;
+        const wishlist: { items: { id: string }[] } = await response.json();
+        setWishlisted(wishlist.items.some((item) => item.id === data.products.id));
+      }).catch(() => toast("Your saved items couldn't be loaded.", "error"));
       const eligibility = await fetch(`/api/reviews?productId=${data.products.id}`);
       if (eligibility.ok) {
         const result: { orders: { id: string; createdAt: string }[] } = await eligibility.json();
@@ -38,7 +46,7 @@ export function ProductDetail({ slug }: { slug: string }) {
       }
     })
       .catch(() => setDetail(null)).finally(() => setLoading(false));
-  }, [slug]);
+  }, [slug, toast]);
   async function addToCart(buyNow: boolean) {
     if (!detail) return;
     const response = await fetch("/api/cart", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ productId: detail.products.id, quantity }) });
@@ -49,11 +57,17 @@ export function ProductDetail({ slug }: { slug: string }) {
     else toast("Added to your bag.");
   }
   async function wishlist() {
-    if (!detail) return;
-    const response = await fetch("/api/wishlist", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ productId: detail.products.id }) });
-    if (response.status === 401) { router.push(`/login?next=${encodeURIComponent(`/products/${slug}`)}`); return; }
-    const result = await response.json();
-    toast(response.ok ? (result.wishlisted ? "Saved to your wishlist." : "Removed from your wishlist.") : result.error, response.ok ? "success" : "error");
+    if (!detail || wishlistBusy) return;
+    setWishlistBusy(true);
+    try {
+      const response = await fetch("/api/wishlist", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ productId: detail.products.id }) });
+      if (response.status === 401) { router.push(`/login?next=${encodeURIComponent(`/products/${slug}`)}`); return; }
+      const result: { wishlisted: boolean; error?: string } = await response.json();
+      toast(response.ok ? (result.wishlisted ? "Saved to your wishlist." : "Removed from your wishlist.") : result.error || "Could not update your wishlist.", response.ok ? "success" : "error");
+      if (response.ok) setWishlisted(result.wishlisted);
+    } finally {
+      setWishlistBusy(false);
+    }
   }
   async function submitReview(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -99,7 +113,7 @@ export function ProductDetail({ slug }: { slug: string }) {
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <div className="flex items-center rounded-full border border-ink/15 bg-white"><button className="p-3" aria-label="Decrease quantity" onClick={() => setQuantity(Math.max(1, quantity - 1))}><Minus size={16} /></button><span className="min-w-8 text-center">{quantity}</span><button className="p-3" aria-label="Increase quantity" onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}><Plus size={16} /></button></div>
           <Button size="lg" className="flex-1" disabled={product.stock === 0} onClick={() => addToCart(false)}>Add to bag</Button>
-          <Button size="lg" variant="secondary" aria-label="Add to wishlist" onClick={wishlist}><Heart size={18} /></Button>
+          <Button size="lg" variant="secondary" aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"} aria-pressed={wishlisted} disabled={wishlistBusy} onClick={wishlist}><Heart size={18} className={wishlisted ? "fill-ink text-ink" : "text-ink/60"} /></Button>
         </div>
         <Button size="lg" variant="dark" className="mt-3 w-full" disabled={product.stock === 0} onClick={() => addToCart(true)}>Buy now</Button>
         <div className="mt-7 grid gap-3 border-t border-ink/10 pt-5 text-sm text-ink/65 sm:grid-cols-2"><p className="flex items-center gap-2"><Truck size={17} />Free shipping over ₹2,000</p><p className="flex items-center gap-2"><ShieldCheck size={17} />Secure checkout</p></div>

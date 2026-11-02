@@ -1,10 +1,26 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+function databaseErrorDetails(error: unknown) {
+  const visited = new Set<object>();
+  let current = error;
+  while (typeof current === "object" && current !== null && !visited.has(current)) {
+    visited.add(current);
+    const record = current as Record<string, unknown>;
+    if (typeof record.code === "string") {
+      return {
+        code: record.code,
+        constraint: typeof record.constraint === "string" ? record.constraint : null,
+      };
+    }
+    current = record.cause;
+  }
+  return null;
+}
+
 export function errorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Something went wrong.";
-  const databaseCode = typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
-    ? error.code : null;
+  const databaseError = databaseErrorDetails(error);
   if (message === "UNAUTHORIZED") return NextResponse.json({ error: "Please sign in to continue." }, { status: 401 });
   if (message === "FORBIDDEN") return NextResponse.json({ error: "You do not have permission to do that." }, { status: 403 });
   if (message.startsWith("Store configuration is incomplete") || message.includes(" is required for this feature.") ||
@@ -21,10 +37,19 @@ export function errorResponse(error: unknown) {
       message.startsWith("Only pending or confirmed orders can be cancelled")) {
     return NextResponse.json({ error: message }, { status: 409 });
   }
-  if (databaseCode === "23505" || databaseCode === "23503") {
+  if (databaseError?.code === "23505") {
+    if (databaseError.constraint === "products_sku_unique") {
+      return NextResponse.json({ error: "That SKU is already in use. Choose a unique SKU." }, { status: 409 });
+    }
+    if (databaseError.constraint === "products_slug_unique") {
+      return NextResponse.json({ error: "That product slug is already in use. Choose a unique slug." }, { status: 409 });
+    }
+    return NextResponse.json({ error: "A record with these details already exists. Check unique fields and try again." }, { status: 409 });
+  }
+  if (databaseError?.code === "23503") {
     return NextResponse.json({ error: "That change conflicts with existing store data. Check related records and try again." }, { status: 409 });
   }
-  if (databaseCode === "23514") {
+  if (databaseError?.code === "23514") {
     return NextResponse.json({ error: "The submitted values do not meet the store's data requirements." }, { status: 400 });
   }
   console.error("API request failed:", error);

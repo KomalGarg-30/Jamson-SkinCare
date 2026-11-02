@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { ArrowRight, Leaf, ShieldCheck, Sparkles } from "lucide-react";
-import { banners, categories, products } from "@/db/schema";
+import { banners, categories, products, wishlistItems } from "@/db/schema";
 import { db } from "@/lib/db";
+import { getSession } from "@/lib/auth";
 import { getSetupError } from "@/lib/env";
 import { ProductCard } from "@/components/product-card";
 import { SectionTitle } from "@/components/section-title";
@@ -12,7 +13,8 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const setupError = getSetupError();
   if (setupError) return <section className="container-page py-28 text-center"><p className="text-xs font-semibold uppercase tracking-[.2em] text-sage-dark">Setup required</p><h1 className="mt-4 font-serif text-4xl">Add your store configuration</h1><p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-ink/60">{setupError} Review the setup steps in README.md, then restart the app.</p></section>;
-  const [categoryList, featured, bestSellers, arrivals, homeBanners] = await Promise.all([
+  const session = await getSession();
+  const [categoryList, featured, bestSellers, arrivals, homeBanners, savedProducts] = await Promise.all([
     db.select().from(categories).where(eq(categories.isActive, true)).orderBy(asc(categories.name)),
     db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock, image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)` })
       .from(products)
@@ -24,7 +26,11 @@ export default async function HomePage() {
       .from(products)
       .where(eq(products.isActive, true)).orderBy(desc(products.createdAt)).limit(4),
     db.select().from(banners).where(eq(banners.isActive, true)).orderBy(asc(banners.position)).limit(1),
+    session
+      ? db.select({ productId: wishlistItems.productId }).from(wishlistItems).where(eq(wishlistItems.userId, session.id))
+      : Promise.resolve([]),
   ]);
+  const savedProductIds = new Set(savedProducts.map((item) => item.productId));
   const hero = homeBanners[0];
   const heroHref = (() => {
     if (!hero?.linkUrl) return "/shop";
@@ -64,16 +70,16 @@ export default async function HomePage() {
 
     <section className="bg-white py-20"><div className="container-page">
       <SectionTitle eyebrow="A few good things" title="Made for your daily ritual" href="/shop" />
-      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{featured.map((product) => <ProductCard key={product.id} product={product} />)}</div>
+      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{featured.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
     </div></section>
 
     <section className="container-page py-20"><SectionTitle eyebrow="Loved by you" title="The everyday favourites" href="/shop?sort=popular" />
-      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{bestSellers.map((product) => <ProductCard key={product.id} product={product} />)}</div>
+      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{bestSellers.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
     </section>
 
     <section className="bg-[#f1ede5] py-20"><div className="container-page">
       <SectionTitle eyebrow="Just arrived" title="New to the shelf" href="/shop?sort=newest" />
-      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{arrivals.map((product) => <ProductCard key={product.id} product={product} />)}</div>
+      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{arrivals.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
     </div></section>
 
     <section className="container-page grid items-center gap-12 py-20 md:grid-cols-2">

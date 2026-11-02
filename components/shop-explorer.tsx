@@ -3,22 +3,33 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProductCard, type ProductSummary } from "@/components/product-card";
+import { useToast } from "@/components/toast-provider";
 
 type Product = ProductSummary & { rating: number; reviewCount: number; stock: number; categoryName: string };
 type Result = { products: Product[]; pages: number; total: number };
 
 export function ShopExplorer() {
   const searchParams = useSearchParams();
+  const toast = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(() => new Set());
   const [sort, setSort] = useState(searchParams.get("sort") || "newest");
   const [category, setCategory] = useState(searchParams.get("category") || "");
   const [q, setQ] = useState(searchParams.get("q") || "");
   const [minimum, setMinimum] = useState("");
   const [maximum, setMaximum] = useState("");
   const [rating, setRating] = useState("");
+  useEffect(() => {
+    fetch("/api/wishlist").then(async (response) => {
+      if (response.status === 401) return;
+      if (!response.ok) throw new Error("Your saved items couldn't be loaded.");
+      const data: { items: { id: string }[] } = await response.json();
+      setWishlistIds(new Set(data.items.map((item) => item.id)));
+    }).catch(() => toast("Your saved items couldn't be loaded.", "error"));
+  }, [toast]);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -48,7 +59,7 @@ export function ShopExplorer() {
       <div className="flex gap-2"><input className="field min-w-0" type="number" min="0" aria-label="Minimum price in rupees" placeholder="Min ₹" value={minimum} onChange={(event) => setMinimum(event.target.value)} /><input className="field min-w-0" type="number" min="0" aria-label="Maximum price in rupees" placeholder="Max ₹" value={maximum} onChange={(event) => setMaximum(event.target.value)} /></div>
     </div>
     {loading ? <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index} className="animate-pulse"><div className="aspect-[4/5] rounded-2xl bg-sand" /><div className="mt-4 h-4 w-2/3 rounded bg-sand" /><div className="mt-2 h-4 w-1/3 rounded bg-sand" /></div>)}</div>
-      : products.length ? <><div className="mb-5 text-sm text-ink/55">{products.length} product{products.length === 1 ? "" : "s"} shown</div><div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{products.map((product) => <ProductCard key={product.id} product={product} />)}</div>
+      : products.length ? <><div className="mb-5 text-sm text-ink/55">{products.length} product{products.length === 1 ? "" : "s"} shown</div><div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{products.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={wishlistIds.has(product.id)} onWishlistChanged={(wishlisted) => setWishlistIds((current) => { const updated = new Set(current); if (wishlisted) updated.add(product.id); else updated.delete(product.id); return updated; })} />)}</div>
         {pages > 1 && <div className="mt-10 flex justify-center gap-3"><button className="rounded-full border px-5 py-2 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><span className="px-3 py-2 text-sm">Page {page} of {pages}</span><button className="rounded-full border px-5 py-2 disabled:opacity-40" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></div>}</>
       : <div className="rounded-2xl bg-white py-20 text-center"><h2 className="font-serif text-2xl">Nothing on the shelf just yet</h2><p className="mt-2 text-sm text-ink/60">Try another search or clear some filters.</p></div>}
   </div>;
