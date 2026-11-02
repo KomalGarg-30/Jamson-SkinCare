@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "addresses_one_default_per_user_idx" ON "addresses" USING btree ("user_id") WHERE "addresses"."is_default";--> statement-breakpoint
+CREATE UNIQUE INDEX "payments_provider_order_idx" ON "payments" USING btree ("provider_order_id") WHERE "payments"."provider_order_id" IS NOT NULL;
