@@ -11,7 +11,7 @@ function createDatabase() {
     throw new Error("DATABASE_URL is required. Add your Neon connection string to .env before starting the store.");
   }
   neonConfig.webSocketConstructor = ws;
-  pool = new Pool({ connectionString, max: 5, idleTimeoutMillis: 1000 });
+  pool = new Pool({ connectionString, max: 1, idleTimeoutMillis: 1000, connectionTimeoutMillis: 10000 });
   return drizzle(pool, { schema });
 }
 

@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { productImages, products, wishlistItems } from "@/db/schema";
+import { products, wishlistItems } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { errorResponse } from "@/lib/api";
@@ -11,11 +11,12 @@ export async function GET() {
     const user = await requireUser();
     const items = await db.select({
       id: products.id, name: products.name, slug: products.slug,
-      price: products.price, discountPrice: products.discountPrice, image: productImages.url,
+      price: products.price, discountPrice: products.discountPrice,
+      image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`,
+      secondImage: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC OFFSET 1 LIMIT 1)`,
     }).from(wishlistItems).innerJoin(products, eq(wishlistItems.productId, products.id))
-      .leftJoin(productImages, eq(productImages.productId, products.id))
       .where(and(eq(wishlistItems.userId, user.id), eq(products.isActive, true)));
-    return NextResponse.json({ items: Array.from(new Map(items.map((item) => [item.id, item])).values()) });
+    return NextResponse.json({ items });
   } catch (error) {
     return errorResponse(error);
   }

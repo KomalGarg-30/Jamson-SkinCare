@@ -49,7 +49,11 @@ export async function PATCH(request: Request) {
         }
         return cancelled;
       }
-      const [updated] = await tx.update(orders).set({ ...updates, updatedAt: new Date() })
+      const [updated] = await tx.update(orders).set({
+        ...updates,
+        ...(updates.status === "delivered" && !previous.deliveredAt ? { deliveredAt: new Date() } : {}),
+        updatedAt: new Date(),
+      })
         .where(eq(orders.id, id)).returning();
       if (updates.paymentStatus) {
         await tx.update(payments).set({ status: updates.paymentStatus, updatedAt: new Date() }).where(eq(payments.orderId, id));

@@ -45,10 +45,20 @@ async function seed() {
       target: products.sku,
       set: { name, slug, categoryId, description, ingredients, howToUse, price, discountPrice, stock, featured, updatedAt: new Date() },
     }).returning({ id: products.id, name: products.name });
-    const [image] = await db.select({ id: productImages.id }).from(productImages).where(eq(productImages.productId, product.id)).limit(1);
-    if (!image) await db.insert(productImages).values({ productId: product.id, url: "/images/product-default.svg", alt: product.name });
+    const savedImages = await db.select().from(productImages).where(eq(productImages.productId, product.id));
+    if (!savedImages.length || savedImages.every((image) => !image.fileId && image.url === "/images/product-default.svg")) {
+      if (savedImages.length) await db.delete(productImages).where(eq(productImages.productId, product.id));
+      await db.insert(productImages).values([
+        { productId: product.id, url: `https://ik.imagekit.io/your_imagekit_id/skincare-store/products/${slug}-front.jpg`, fileId: null, altText: `${product.name} - sample front image`, position: 0, isMain: true },
+        { productId: product.id, url: `https://ik.imagekit.io/your_imagekit_id/skincare-store/products/${slug}-detail.jpg`, fileId: null, altText: `${product.name} - sample detail image`, position: 1, isMain: false },
+      ]);
+    }
   }
-  for (const [key, value] of [["store_name", "Jamson Wellness"], ["shipping_charge", "9900"], ["free_shipping_threshold", "200000"], ["tax_percent", "0"]]) {
+  for (const [key, value] of [
+    ["store_name", "Jamson Wellness"], ["shipping_charge", "9900"],
+    ["free_shipping_threshold", "200000"], ["tax_percent", "0"],
+    ["return_window_days", process.env.RETURN_WINDOW_DAYS || "7"],
+  ]) {
     await db.insert(settings).values({ key, value }).onConflictDoNothing();
   }
   console.log("Seed complete: 4 categories and 12 products are ready.");

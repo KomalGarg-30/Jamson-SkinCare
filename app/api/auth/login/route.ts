@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { compare } from "bcryptjs";
-import { users } from "@/db/schema";
+import { auditLogs, users } from "@/db/schema";
 import { db } from "@/lib/db";
 import { createSession } from "@/lib/auth";
 import { errorResponse } from "@/lib/api";
@@ -11,14 +11,19 @@ import { rateLimit } from "@/lib/rate-limit";
 export async function POST(request: Request) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
-    if (!rateLimit(`login:${ip}`, 8)) return NextResponse.json({ error: "Too many sign-in attempts. Try again shortly." }, { status: 429 });
+    if (!await rateLimit(`login:${ip}`, 8)) return NextResponse.json({ error: "Too many sign-in attempts. Try again shortly." }, { status: 429 });
     const data = loginSchema.parse(await request.json());
-    const [user] = await db.select().from(users).where(eq(users.email, data.email.toLowerCase())).limit(1);
-    if (!user || !(await compare(data.password, user.passwordHash))) {
+    const [record] = await db.select().from(users).where(eq(users.email, data.email.toLowerCase())).limit(1);
+    if (!record || !(await compare(data.password, record.passwordHash))) {
       return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
     }
-    if (user.isBlocked) return NextResponse.json({ error: "This account is currently unavailable. Please contact support." }, { status: 403 });
-    await createSession({ id: user.id, name: user.name, email: user.email, role: user.role });
+    if (record.isBlocked || record.deletedAt) return NextResponse.json({ error: "This account is currently unavailable. Please contact support." }, { status: 403 });
+    const [user] = await db.update(users).set({ lastLoginAt: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, record.id)).returning({
+        id: users.id, name: users.name, email: users.email, role: users.role, sessionVersion: users.sessionVersion,
+      });
+    await db.insert(auditLogs).values({ actorUserId: user.id, targetUserId: user.id, action: "login" });
+    await createSession(user);
     return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (error) {
     return errorResponse(error);

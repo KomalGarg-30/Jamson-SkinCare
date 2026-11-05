@@ -16,13 +16,13 @@ export default async function HomePage() {
   const session = await getSession();
   const [categoryList, featured, bestSellers, arrivals, homeBanners, savedProducts] = await Promise.all([
     db.select().from(categories).where(eq(categories.isActive, true)).orderBy(asc(categories.name)),
-    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock, image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)` })
+    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock, image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`, secondImage: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC OFFSET 1 LIMIT 1)` })
       .from(products)
       .where(and(eq(products.featured, true), eq(products.isActive, true))).orderBy(desc(products.createdAt)).limit(4),
-    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock, image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)` })
+    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock, image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`, secondImage: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC OFFSET 1 LIMIT 1)` })
       .from(products)
       .where(eq(products.isActive, true)).orderBy(desc(products.reviewCount)).limit(4),
-    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock, image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)` })
+    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock, image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`, secondImage: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC OFFSET 1 LIMIT 1)` })
       .from(products)
       .where(eq(products.isActive, true)).orderBy(desc(products.createdAt)).limit(4),
     db.select().from(banners).where(eq(banners.isActive, true)).orderBy(asc(banners.position)).limit(1),

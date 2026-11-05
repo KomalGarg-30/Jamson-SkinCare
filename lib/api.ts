@@ -24,7 +24,7 @@ export function errorResponse(error: unknown) {
   if (message === "UNAUTHORIZED") return NextResponse.json({ error: "Please sign in to continue." }, { status: 401 });
   if (message === "FORBIDDEN") return NextResponse.json({ error: "You do not have permission to do that." }, { status: 403 });
   if (message.startsWith("Store configuration is incomplete") || message.includes(" is required for this feature.") ||
-      message.startsWith("DATABASE_URL is required.")) {
+      message.startsWith("DATABASE_URL is required.") || message.startsWith("Image uploads are not configured.")) {
     return NextResponse.json({ error: message }, { status: 503 });
   }
   if (error instanceof ZodError) {
@@ -51,6 +51,12 @@ export function errorResponse(error: unknown) {
   }
   if (databaseError?.code === "23514") {
     return NextResponse.json({ error: "The submitted values do not meet the store's data requirements." }, { status: 400 });
+  }
+  if (databaseError?.code === "42703" || databaseError?.code === "42P01") {
+    console.error("Database schema is behind the application schema:", error);
+    return NextResponse.json({
+      error: "The database needs its latest schema update before this action can work. Run `npm run db:push` from the project folder, then restart the app.",
+    }, { status: 503 });
   }
   console.error("API request failed:", error);
   return NextResponse.json({ error: "Something went wrong while processing your request. Please try again." }, { status: 500 });

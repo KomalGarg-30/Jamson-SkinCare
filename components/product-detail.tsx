@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Heart, Minus, Plus, ShieldCheck, Star, Truck } from "lucide-react";
+import { ChevronLeft, ChevronRight, Heart, Minus, Plus, ShieldCheck, Star, Truck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/toast-provider";
 import { formatPrice } from "@/lib/utils";
+import { StoreImage } from "@/components/store-image";
 
 type Detail = {
   products: { id: string; name: string; description: string; ingredients: string | null; howToUse: string | null; price: number; discountPrice: number | null; stock: number; rating: number; reviewCount: number; brand: string };
   categories: { name: string; slug: string };
-  images: { id: string; url: string; alt: string }[];
+  images: { id: string; url: string; altText: string }[];
   reviews: { id: string; rating: number; title: string | null; body: string; customer: string; createdAt: string }[];
 };
 
@@ -19,6 +20,8 @@ export function ProductDetail({ slug }: { slug: string }) {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [image, setImage] = useState("");
+  const [lightbox, setLightbox] = useState(false);
+  const touchStart = useRef<number | null>(null);
   const [wishlisted, setWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
   const [eligibleOrders, setEligibleOrders] = useState<{ id: string; createdAt: string }[]>([]);
@@ -98,10 +101,21 @@ export function ProductDetail({ slug }: { slug: string }) {
   if (loading) return <div className="container-page grid animate-pulse gap-10 py-14 md:grid-cols-2"><div className="aspect-square rounded-3xl bg-sand" /><div className="h-96 rounded-3xl bg-sand" /></div>;
   if (!detail) return <div className="container-page py-24 text-center"><h1 className="font-serif text-3xl">We couldn&apos;t find that product</h1><a className="mt-5 inline-block text-sage-dark underline" href="/shop">Browse the collection</a></div>;
   const product = detail.products;
+  const activeImageIndex = Math.max(0, detail.images.findIndex((item) => item.url === image));
+  const activeImage = detail.images[activeImageIndex];
+  const changeImage = (offset: number) => {
+    if (detail.images.length) setImage(detail.images[(activeImageIndex + offset + detail.images.length) % detail.images.length].url);
+  };
   return <div className="container-page py-10 md:py-16">
     <div className="grid gap-10 md:grid-cols-2 md:gap-16">
-      <div><div className="overflow-hidden rounded-[2rem] bg-sand"><img src={image} alt={product.name} className="aspect-square w-full object-cover" /></div>
-        {detail.images.length > 1 && <div className="mt-4 flex gap-3">{detail.images.map((item) => <button key={item.id} onClick={() => setImage(item.url)} className="h-20 w-20 overflow-hidden rounded-xl border-2 border-transparent hover:border-sage"><img src={item.url} alt={item.alt} className="h-full w-full object-cover" /></button>)}</div>}
+      <div><button type="button" aria-label="Open product image" onClick={() => setLightbox(true)}
+        onTouchStart={(event) => { touchStart.current = event.touches[0]?.clientX ?? null; }}
+        onTouchEnd={(event) => { const end = event.changedTouches[0]?.clientX; if (touchStart.current !== null && end !== undefined && Math.abs(end - touchStart.current) > 40) changeImage(end < touchStart.current ? 1 : -1); touchStart.current = null; }}
+        className="group block w-full overflow-hidden rounded-[2rem] bg-sand">
+        <StoreImage src={activeImage?.url || image} alt={activeImage?.altText || product.name} width={1000} height={1000}
+          className="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-105" eager />
+      </button>
+        {detail.images.length > 1 && <div className="mt-4 flex gap-3 overflow-x-auto">{detail.images.map((item, index) => <button key={item.id} aria-label={`View product image ${index + 1}`} aria-pressed={index === activeImageIndex} onClick={() => setImage(item.url)} className={`h-20 w-20 shrink-0 overflow-hidden rounded-xl border-2 ${index === activeImageIndex ? "border-sage-dark" : "border-transparent hover:border-sage"}`}><StoreImage src={item.url} alt={item.altText || product.name} width={160} height={160} className="h-full w-full object-cover" /></button>)}</div>}
       </div>
       <div className="py-2">
         <p className="text-xs font-semibold uppercase tracking-[.18em] text-sage-dark">{detail.categories.name} · {product.brand}</p>
@@ -134,5 +148,11 @@ export function ProductDetail({ slug }: { slug: string }) {
         <button disabled={reviewBusy} className="w-fit rounded-full bg-sage-dark px-6 py-3 text-sm text-white disabled:opacity-50">{reviewBusy ? "Submitting…" : "Submit review"}</button>
       </form>}
     </section>
+    {lightbox && <div role="dialog" aria-modal="true" aria-label="Product image gallery" className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+      <button type="button" aria-label="Close image gallery" onClick={() => setLightbox(false)} className="absolute right-4 top-4 rounded-full bg-white/10 p-3 text-white"><X /></button>
+      {detail.images.length > 1 && <button type="button" aria-label="Previous image" onClick={() => changeImage(-1)} className="absolute left-3 rounded-full bg-white/10 p-3 text-white"><ChevronLeft /></button>}
+      <StoreImage src={activeImage?.url || image} alt={activeImage?.altText || product.name} width={1400} height={1400} eager className="max-h-[90vh] max-w-[90vw] object-contain" />
+      {detail.images.length > 1 && <button type="button" aria-label="Next image" onClick={() => changeImage(1)} className="absolute right-3 rounded-full bg-white/10 p-3 text-white"><ChevronRight /></button>}
+    </div>}
   </div>;
 }

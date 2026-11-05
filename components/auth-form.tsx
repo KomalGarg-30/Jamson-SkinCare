@@ -46,10 +46,12 @@ export function RecoveryForm({ reset = false }: { reset?: boolean }) {
   const search = useSearchParams();
   const toast = useToast();
   const [error, setError] = React.useState("");
+  const [devResetUrl, setDevResetUrl] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setDevResetUrl("");
     setBusy(true);
     const formData = new FormData(event.currentTarget);
     const body = reset
@@ -58,9 +60,10 @@ export function RecoveryForm({ reset = false }: { reset?: boolean }) {
     const response = await fetch(`/api/auth/${reset ? "reset-password" : "forgot-password"}`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
     });
-    const result: { message?: string; error?: string } = await response.json();
+    const result: { message?: string; error?: string; devResetUrl?: string } = await response.json();
     setBusy(false);
     if (!response.ok) { setError(result.error || "Please check your details and try again."); return; }
+    if (!reset && result.devResetUrl) setDevResetUrl(result.devResetUrl);
     toast(result.message || "Done.");
     if (reset) router.replace("/login");
   }
@@ -68,6 +71,10 @@ export function RecoveryForm({ reset = false }: { reset?: boolean }) {
     {!reset ? <label className="grid gap-2 text-sm">Email address<input className="field" name="email" type="email" required /></label>
       : <label className="grid gap-2 text-sm">New password<input className="field" name="password" type="password" minLength={10} required /></label>}
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+    {devResetUrl && <div role="status" className="rounded-xl bg-sage/10 p-4 text-sm">
+      <p className="mb-2">Development reset link:</p>
+      <a className="break-all font-medium text-sage-dark underline" href={devResetUrl}>Open password reset</a>
+    </div>}
     <Button size="lg" disabled={busy}>{busy ? "Please wait…" : reset ? "Update password" : "Send reset link"}</Button>
     <Link className="text-center text-sm text-sage-dark underline" href="/login">Back to sign in</Link>
   </form>;

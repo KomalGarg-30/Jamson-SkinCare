@@ -22,6 +22,27 @@
       "when": 1793531082093,
       "tag": "0002_wealthy_jack_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793897257656,
+      "tag": "0003_pretty_old_lace",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793900893139,
+      "tag": "0004_imagekit_product_images",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793903490409,
+      "tag": "0005_classy_cammi",
+      "breakpoints": true
     }
   ]
 }

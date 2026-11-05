@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { cartItems, productImages, products, settings } from "@/db/schema";
+import { cartItems, products, settings } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { errorResponse } from "@/lib/api";
@@ -12,9 +12,8 @@ export async function GET() {
     const items = await db.select({
       id: cartItems.id, quantity: cartItems.quantity, productId: products.id, name: products.name,
       slug: products.slug, price: products.price, discountPrice: products.discountPrice, stock: products.stock,
-      image: productImages.url,
+      image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`,
     }).from(cartItems).innerJoin(products, eq(cartItems.productId, products.id))
-      .leftJoin(productImages, eq(productImages.productId, products.id))
       .where(and(eq(cartItems.userId, user.id), eq(products.isActive, true)));
     const distinctItems = Array.from(new Map(items.map((item) => [item.id, item])).values());
     const subtotal = distinctItems.reduce((sum, item) => sum + (item.discountPrice ?? item.price) * item.quantity, 0);

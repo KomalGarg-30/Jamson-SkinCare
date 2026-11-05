@@ -1,0 +1,50 @@
+import { neonConfig, Pool } from "@neondatabase/serverless";
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
+import ws from "ws";
+
+if (!process.env.DATABASE_URL_UNPOOLED) {
+  throw new Error("Set DATABASE_URL_UNPOOLED to the direct Neon connection string before running production migrations.");
+}
+
+async function migrateProduction() {
+  neonConfig.webSocketConstructor = ws;
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL_UNPOOLED, max: 1 });
+  try {
+    const { rows } = await pool.query(
+      "SELECT to_regclass('public.users') AS users_table, to_regclass('public.products') AS products_table, to_regclass('drizzle.__drizzle_migrations') AS drizzle_migrations, to_regclass('public.__drizzle_migrations') AS public_migrations",
+    );
+    const state = rows[0] as {
+      users_table: string | null;
+      products_table: string | null;
+      drizzle_migrations: string | null;
+      public_migrations: string | null;
+    };
+    const historyTable = state.drizzle_migrations || state.public_migrations;
+    const existingApplicationSchema = Boolean(state.users_table || state.products_table);
+    let migrationCount = 0;
+    if (historyTable) {
+      const { rows: migrationRows } = await pool.query(
+        `SELECT count(*)::int AS count FROM ${historyTable}`,
+      );
+      migrationCount = Number((migrationRows[0] as { count: number }).count);
+    }
+    if (existingApplicationSchema && migrationCount === 0) {
+      throw new Error(
+        "Production migrations stopped: application tables exist but Drizzle has no recorded migration history. Do not apply the initial migrations to an existing db:push database. Reconcile and verify its migration baseline on a Neon branch first.",
+      );
+    }
+  } finally {
+    await pool.end();
+  }
+
+  const cli = resolve("node_modules", "drizzle-kit", "bin.cjs");
+  const result = spawnSync(process.execPath, [cli, "migrate"], { stdio: "inherit", env: process.env });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exitCode = result.status ?? 1;
+}
+
+migrateProduction().catch((error: unknown) => {
+  console.error("Production migration failed:", error);
+  process.exitCode = 1;
+});

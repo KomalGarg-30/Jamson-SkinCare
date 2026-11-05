@@ -11,7 +11,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
       .where(and(eq(products.slug, slug), eq(products.isActive, true), eq(categories.isActive, true))).limit(1);
     if (!product) return NextResponse.json({ error: "Product not found." }, { status: 404 });
     const [images, productReviews] = await Promise.all([
-      db.select().from(productImages).where(eq(productImages.productId, product.products.id)).orderBy(productImages.position),
+      db.select({
+        id: productImages.id, url: productImages.url, altText: productImages.altText,
+        position: productImages.position, isMain: productImages.isMain,
+      }).from(productImages).where(eq(productImages.productId, product.products.id)).orderBy(productImages.position),
       db.select({ id: reviews.id, rating: reviews.rating, title: reviews.title, body: reviews.body, createdAt: reviews.createdAt, customer: users.name })
         .from(reviews).innerJoin(users, eq(reviews.userId, users.id))
         .where(and(eq(reviews.productId, product.products.id), eq(reviews.isApproved, true))),

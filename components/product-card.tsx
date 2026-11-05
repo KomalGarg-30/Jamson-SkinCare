@@ -6,10 +6,11 @@ import { useRouter } from "next/navigation";
 import { Heart, ShoppingBag, Star } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import { formatPrice } from "@/lib/utils";
+import { StoreImage } from "@/components/store-image";
 
 export type ProductSummary = {
   id: string; name: string; slug: string; description?: string; price: number;
-  discountPrice: number | null; image: string | null; rating?: number; reviewCount?: number; stock?: number;
+  discountPrice: number | null; image: string | null; secondImage?: string | null; rating?: number; reviewCount?: number; stock?: number;
 };
 
 export function ProductCard({ product, initialWishlisted = false, onWishlistChanged }: {
@@ -45,7 +46,10 @@ export function ProductCard({ product, initialWishlisted = false, onWishlistChan
   return <article className="group">
     <div className="relative overflow-hidden rounded-2xl bg-sand">
       <Link href={`/products/${product.slug}`} className="block aspect-[4/5]">
-        <img src={product.image || "/images/product-default.svg"} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <StoreImage src={product.image} alt={product.name} width={600} height={750}
+          className={`absolute inset-0 h-full w-full object-cover transition duration-500 ${product.secondImage ? "group-hover:opacity-0" : "group-hover:scale-105"}`} />
+        {product.secondImage && <StoreImage src={product.secondImage} alt={`${product.name} alternate view`} width={600} height={750}
+          className="absolute inset-0 h-full w-full object-cover opacity-0 transition duration-500 group-hover:opacity-100" />}
       </Link>
       {product.discountPrice && <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1 text-xs font-medium text-sage-dark">Bestseller</span>}
       <button onClick={toggleWishlist} disabled={wishlistBusy} aria-label={wishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`} aria-pressed={wishlisted} className={`absolute right-3 top-3 rounded-full bg-white/90 p-2.5 transition hover:text-rose disabled:opacity-60 ${wishlisted ? "text-ink" : "text-ink/65"}`}><Heart size={17} className={wishlisted ? "fill-current" : ""} /></button>

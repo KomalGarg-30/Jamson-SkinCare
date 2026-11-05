@@ -32,6 +32,7 @@ export async function GET(request: Request) {
       rating: products.rating, reviewCount: products.reviewCount, featured: products.featured,
       categoryName: categories.name, categorySlug: categories.slug,
       image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`,
+      secondImage: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC OFFSET 1 LIMIT 1)`,
     }).from(products).innerJoin(categories, eq(products.categoryId, categories.id))
       .where(and(...conditions)).orderBy(orderBy).limit(limit).offset((page - 1) * limit);
     const total = await db.select({ count: sql<number>`count(distinct ${products.id})::int` })

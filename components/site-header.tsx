@@ -66,7 +66,7 @@ export function SiteHeader() {
         <div className="group relative">
           <button aria-label="Account menu" className="rounded-full p-2 hover:bg-sand"><UserRound size={19} /></button>
           <div className="invisible absolute right-0 top-full w-48 rounded-xl border border-ink/10 bg-white p-2 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-            {user ? <><Link className="dropdown-link" href="/profile">My profile</Link><Link className="dropdown-link" href="/orders">My orders</Link>{user.role === "admin" && <Link className="dropdown-link" href={isAdminPage ? "/" : "/admin"}>{isAdminPage ? "Go to storefront" : "Admin dashboard"}</Link>}<button onClick={logout} className="dropdown-link w-full text-left">Sign out</button></>
+            {user ? <><Link className="dropdown-link" href="/account">My account</Link><Link className="dropdown-link" href="/orders">My orders</Link>{user.role === "admin" && <Link className="dropdown-link" href={isAdminPage ? "/" : "/admin"}>{isAdminPage ? "Go to storefront" : "Admin dashboard"}</Link>}<button onClick={logout} className="dropdown-link w-full text-left">Sign out</button></>
               : <><Link className="dropdown-link" href="/login">Sign in</Link><Link className="dropdown-link" href="/signup">Create account</Link></>}
           </div>
         </div>

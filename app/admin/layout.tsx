@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { BarChart3, Boxes, ClipboardList, FolderTree, Image, MessageSquare, Settings, Users, TicketPercent } from "lucide-react";
+import { BarChart3, Boxes, ClipboardList, FolderTree, Image, MessageSquare, Settings, Users, TicketPercent, RotateCcw } from "lucide-react";
 import { requireAdminPage } from "@/lib/auth";
 
 const links = [
   ["Overview", "/admin", BarChart3], ["Products", "/admin/products", Boxes],
   ["Categories", "/admin/categories", FolderTree], ["Orders", "/admin/orders", ClipboardList],
-  ["Customers", "/admin/customers", Users], ["Reviews", "/admin/reviews", MessageSquare],
+  ["Customers", "/admin/customers", Users], ["Users", "/admin/users", Users],
+  ["Returns", "/admin/returns", RotateCcw], ["Reviews", "/admin/reviews", MessageSquare],
   ["Coupons", "/admin/coupons", TicketPercent], ["Banners", "/admin/banners", Image],
   ["Settings", "/admin/settings", Settings],
 ] as const;

@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { orderItems, orders, reviews } from "@/db/schema";
+import { orderItems, orders, products, reviews } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { errorResponse } from "@/lib/api";
@@ -38,6 +38,26 @@ export async function POST(request: Request) {
     if (!purchase) return NextResponse.json({ error: "You can review products only after purchasing them." }, { status: 403 });
     const [review] = await db.insert(reviews).values({ ...data, userId: user.id }).returning();
     return NextResponse.json({ review, message: "Thanks! Your review will appear after approval." }, { status: 201 });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await requireUser();
+    const parsedId = z.uuid().safeParse(new URL(request.url).searchParams.get("id"));
+    if (!parsedId.success) return NextResponse.json({ error: "Review id is required." }, { status: 400 });
+    const [review] = await db.delete(reviews).where(and(eq(reviews.id, parsedId.data), eq(reviews.userId, user.id)))
+      .returning({ productId: reviews.productId });
+    if (!review) return NextResponse.json({ error: "Review not found." }, { status: 404 });
+    const approved = await db.select({ rating: reviews.rating }).from(reviews)
+      .where(and(eq(reviews.productId, review.productId), eq(reviews.isApproved, true)));
+    await db.update(products).set({
+      reviewCount: approved.length,
+      rating: approved.length ? Math.round(approved.reduce((sum, item) => sum + item.rating, 0) * 100 / approved.length) : 0,
+    }).where(eq(products.id, review.productId));
+    return NextResponse.json({ success: true });
   } catch (error) {
     return errorResponse(error);
   }

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getEnv } from "@/lib/env";
+import { getAppUrl } from "@/lib/env";
 import { db } from "@/lib/db";
 import { products, categories } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = getEnv().NEXT_PUBLIC_APP_URL;
+  const baseUrl = getAppUrl();
   const [catalog, categoryList] = await Promise.all([
     db.select({ slug: products.slug, updatedAt: products.updatedAt }).from(products).where(eq(products.isActive, true)),
     db.select({ slug: categories.slug, updatedAt: categories.updatedAt }).from(categories).where(eq(categories.isActive, true)),
