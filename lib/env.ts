@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const schema = z.object({
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid Neon pooled connection URL."),
-  DATABASE_URL_UNPOOLED: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  DATABASE_URL_UNPOOLED: z.preprocess((value) => value === "" ? undefined : value, z.string().url("DATABASE_URL_UNPOOLED must be a valid Neon direct connection URL.").optional()),
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters. Generate a secure random value."),
   CRON_SECRET: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
   NEXT_PUBLIC_APP_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
@@ -34,21 +34,6 @@ function deploymentIssues(data: z.infer<typeof schema>) {
   const missing: string[] = [];
   if (!data.NEXT_PUBLIC_APP_URL && !data.VERCEL_URL) missing.push("NEXT_PUBLIC_APP_URL (or VERCEL_URL)");
   if (process.env.VERCEL === "1" || process.env.DEPLOYMENT_ENV_CHECK === "1") {
-    if (!data.DATABASE_URL_UNPOOLED) missing.push("DATABASE_URL_UNPOOLED");
-    if (!data.CRON_SECRET) missing.push("CRON_SECRET");
-    if (!data.IMAGEKIT_PUBLIC_KEY) missing.push("IMAGEKIT_PUBLIC_KEY");
-    if (!data.IMAGEKIT_PRIVATE_KEY) missing.push("IMAGEKIT_PRIVATE_KEY");
-    if (!data.IMAGEKIT_URL_ENDPOINT) missing.push("IMAGEKIT_URL_ENDPOINT");
-    if (!data.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY) missing.push("NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY");
-    if (!data.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT) missing.push("NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT");
-    if (!data.RAZORPAY_KEY_ID) missing.push("RAZORPAY_KEY_ID");
-    if (!data.RAZORPAY_KEY_SECRET) missing.push("RAZORPAY_KEY_SECRET");
-    if (!data.NEXT_PUBLIC_RAZORPAY_KEY_ID) missing.push("NEXT_PUBLIC_RAZORPAY_KEY_ID");
-    if (!data.RAZORPAY_WEBHOOK_SECRET) missing.push("RAZORPAY_WEBHOOK_SECRET");
-    for (const key of ["EMAIL_HOST", "EMAIL_USER", "EMAIL_PASSWORD", "EMAIL_FROM"] as const) {
-      if (!data[key]) missing.push(key);
-    }
-
     const pooledHost = new URL(data.DATABASE_URL).hostname;
     if (!pooledHost.includes("-pooler")) missing.push("DATABASE_URL (must be the Neon pooled connection string containing -pooler)");
     if (data.DATABASE_URL_UNPOOLED && new URL(data.DATABASE_URL_UNPOOLED).hostname.includes("-pooler")) {

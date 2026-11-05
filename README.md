@@ -44,7 +44,7 @@ Jamson/
 1. **Create Neon database credentials.** Create a project at [Neon](https://neon.tech/), open **Connect**, and copy its PostgreSQL connection string. Use the pooled connection string and keep `sslmode=require`.
 2. **Configure image uploads.** Create a free [ImageKit](https://imagekit.io/) account and open **Developer options → API keys** in the dashboard. Copy the public key and private key there, and copy the URL endpoint shown for your media library (for example, `https://ik.imagekit.io/your_id`). Paste these into the matching `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, and `IMAGEKIT_URL_ENDPOINT` entries in `.env`. Also set `NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY` to the same public key and `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` to the same endpoint; these two values are safe for browser use. Never put the private key in a `NEXT_PUBLIC_` variable or expose it to the browser. The upload folder, 5 MB image limit, and 8-image product limit have defaults and can be changed with `IMAGEKIT_UPLOAD_FOLDER`, `MAX_IMAGE_SIZE_MB`, and `MAX_IMAGES_PER_PRODUCT`.
 3. **Configure payments.** Create a [Razorpay](https://razorpay.com/) account and obtain the test or live Key ID and Key Secret from **Account & Settings → API Keys**. Add a webhook pointing to `https://YOUR_APP_HOST/api/webhooks/razorpay`, subscribe to `payment.captured`, `payment.failed`, and `refund.processed`, and copy its webhook secret.
-4. **Configure email.** Add SMTP host, port, user, password and a verified sender address from your email provider. Password reset requires these values.
+4. **Configure email (optional until needed).** Add SMTP host, port, user, password and a verified sender address from your email provider to enable password reset emails. The store can be deployed without these values.
 5. Copy `.env.example` to `.env` (or use the included `.env` template) and fill in the values:
 
    ```dotenv
@@ -74,7 +74,7 @@ Jamson/
    RETURN_WINDOW_DAYS=7
    ```
 
-   Generate `JWT_SECRET` with a secure random generator (for example `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`). Never commit `.env`; `.gitignore` excludes it. The app reports missing required configuration with a clear message.
+   Generate `JWT_SECRET` with a secure random generator (for example `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`). `DATABASE_URL` and `JWT_SECRET` are required for the store; ImageKit, Razorpay, SMTP, and cron credentials can be added later to enable their corresponding features. Never commit `.env`; `.gitignore` excludes it. The app reports when a feature needs missing configuration.
 
 6. Install dependencies, create the schema, seed sample products and start the entire app:
 

@@ -4,7 +4,7 @@ This project is configured for Vercel's Next.js runtime and Neon PostgreSQL. Ver
 
 ## Prerequisites
 
-Create accounts for GitHub, Vercel, Neon, ImageKit, Razorpay, Upstash (optional; this application currently uses PostgreSQL-backed rate limiting), and an SMTP/email provider.
+Create accounts for GitHub, Vercel, and Neon. ImageKit, Razorpay, and an SMTP/email provider are needed only when enabling their corresponding optional features. Upstash is reserved for a future limiter; the application currently uses PostgreSQL-backed rate limiting.
 
 ## 1. Push the repository to GitHub
 
@@ -74,28 +74,28 @@ Add these in **Project Settings → Environment Variables**. Use test Razorpay c
 | Variable | Where to get it | Required? |
 |---|---|---|
 | `NODE_ENV` | Set automatically by Vercel | No |
-| `NEXT_PUBLIC_APP_URL` | Your production URL, e.g. `https://yourstore.vercel.app`; set this explicitly, especially when using a custom domain | Production |
+| `NEXT_PUBLIC_APP_URL` | Your production URL, e.g. `https://yourstore.vercel.app`; set explicitly for a custom domain (`VERCEL_URL` is the fallback) | Recommended |
 | `DATABASE_URL` | Neon **pooled** connection string (host includes `-pooler`) | Yes |
-| `DATABASE_URL_UNPOOLED` | Neon **direct/non-pooled** connection string; migration-only | Yes |
+| `DATABASE_URL_UNPOOLED` | Neon **direct/non-pooled** connection string; required only when running migrations | Migrations |
 | `JWT_SECRET` | Generate with `openssl rand -base64 32` (or a secure password generator); use a unique value per environment | Yes |
-| `CRON_SECRET` | Generate a long random secret; sent only by Vercel Cron | Yes |
-| `IMAGEKIT_PUBLIC_KEY` | ImageKit dashboard → Developer options → API keys | Yes |
-| `IMAGEKIT_PRIVATE_KEY` | ImageKit dashboard → Developer options → API keys; server-only | Yes |
-| `IMAGEKIT_URL_ENDPOINT` | ImageKit dashboard, e.g. `https://ik.imagekit.io/your_id` | Yes |
-| `NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY` | Same ImageKit public key | Yes |
-| `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` | Same ImageKit URL endpoint | Yes |
+| `CRON_SECRET` | Generate a long random secret; sent only by Vercel Cron | Scheduled cleanup |
+| `IMAGEKIT_PUBLIC_KEY` | ImageKit dashboard → Developer options → API keys | Image uploads |
+| `IMAGEKIT_PRIVATE_KEY` | ImageKit dashboard → Developer options → API keys; server-only | Image uploads |
+| `IMAGEKIT_URL_ENDPOINT` | ImageKit dashboard, e.g. `https://ik.imagekit.io/your_id` | Image uploads |
+| `NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY` | Same ImageKit public key | Image uploads |
+| `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` | Same ImageKit URL endpoint | Image uploads |
 | `IMAGEKIT_UPLOAD_FOLDER` | ImageKit folder; defaults to `/skincare-store/products` | No |
 | `MAX_IMAGE_SIZE_MB` | Product image upload limit; defaults to `5` | No |
 | `MAX_IMAGES_PER_PRODUCT` | Product image count limit; defaults to `8` | No |
-| `RAZORPAY_KEY_ID` | Razorpay dashboard → API Keys; TEST in Preview, LIVE in Production | Production |
-| `RAZORPAY_KEY_SECRET` | Razorpay dashboard → API Keys; server-only | Production |
-| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Same environment's Razorpay Key ID | Production |
-| `RAZORPAY_WEBHOOK_SECRET` | The secret configured for the Razorpay webhook | Production |
-| `EMAIL_HOST` | SMTP provider | Production |
-| `EMAIL_PORT` | SMTP provider (commonly `587`) | Production |
-| `EMAIL_USER` | SMTP provider | Production |
-| `EMAIL_PASSWORD` | SMTP provider password/API credential | Production |
-| `EMAIL_FROM` | Verified sender address from the email provider | Production |
+| `RAZORPAY_KEY_ID` | Razorpay dashboard → API Keys; TEST in Preview, LIVE in Production | Online payments/refunds |
+| `RAZORPAY_KEY_SECRET` | Razorpay dashboard → API Keys; server-only | Online payments/refunds |
+| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Same environment's Razorpay Key ID | Online payments |
+| `RAZORPAY_WEBHOOK_SECRET` | The secret configured for the Razorpay webhook | Online payment webhooks |
+| `EMAIL_HOST` | SMTP provider | Password reset email |
+| `EMAIL_PORT` | SMTP provider (commonly `587`) | Password reset email; defaults to `587` |
+| `EMAIL_USER` | SMTP provider | Password reset email |
+| `EMAIL_PASSWORD` | SMTP provider password/API credential | Password reset email |
+| `EMAIL_FROM` | Verified sender address from the email provider | Password reset email |
 | `RETURN_WINDOW_DAYS` | Number of days after delivery to allow a return; defaults to `7` | No |
 | `STORE_NAME` | Your customer-facing store name | No |
 | `CURRENCY` | ISO currency code, e.g. `INR` | No |
@@ -104,11 +104,11 @@ Add these in **Project Settings → Environment Variables**. Use test Razorpay c
 | `AUDIT_LOG_RETENTION_DAYS` | Optional retention in days; unset preserves audit history indefinitely | No |
 | `VERCEL_URL` | Supplied automatically by Vercel; fallback when constructing absolute URLs | No |
 
-Set public variables for Production, Preview, and Development as appropriate. Never prefix private credentials with `NEXT_PUBLIC_`. The startup validator reports missing or malformed production configuration at build/startup without returning secret values.
+`DATABASE_URL` and `JWT_SECRET` are required for the store; Vercel provides `VERCEL_URL` for absolute links, though `NEXT_PUBLIC_APP_URL` should be set for a custom domain. Add integration variables when enabling their feature; missing credentials do not block the build, and the affected action reports that its configuration is needed. The scheduled cleanup endpoint remains disabled until `CRON_SECRET` is set. `DATABASE_URL_UNPOOLED` is needed only for database migrations. Set public variables for Production, Preview, and Development as appropriate, and never prefix private credentials with `NEXT_PUBLIC_`. Supplied values are still validated during the build without printing secret values.
 
-## 6. Deploy and configure webhooks
+## 6. Configure Razorpay webhooks (optional)
 
-Deploy from Vercel and wait for the build to complete. In the Razorpay dashboard, add:
+Skip this step until enabling Razorpay payments. After deploying and adding Razorpay credentials in Vercel, configure the webhook in the Razorpay dashboard:
 
 - Webhook URL: `https://<your-domain>/api/webhooks/razorpay`
 - Events: `payment.captured`, `payment.failed`, and `refund.processed`
