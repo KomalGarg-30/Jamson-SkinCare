@@ -128,3 +128,44 @@ export function paymentAmountInPaise(amount: number) {
 export function paymentExpiryDate() {
   return new Date(Date.now() + getEnv().PAYMENT_PENDING_EXPIRY_MINUTES * 60_000);
 }
+
+export async function reconcilePendingOrder(orderId: string, userId: string) {
+  const [record] = await db.select({
+    order: orders,
+    payment: payments,
+  }).from(orders).innerJoin(payments, eq(payments.orderId, orders.id))
+    .where(and(eq(orders.id, orderId), eq(orders.userId, userId), eq(orders.status, "pending_payment")))
+    .limit(1);
+  if (!record?.payment.providerOrderId) return "not_pending" as const;
+
+  const gatewayPayments = await razorpayClient().orders.fetchPayments(record.payment.providerOrderId) as {
+    items?: Array<{ id?: string; amount?: number; currency?: string; status?: string; method?: string }>;
+  };
+  const paid = gatewayPayments.items?.find((payment) => payment.status === "captured");
+  if (paid?.id && paid.amount === record.payment.amount && paid.currency === getEnv().CURRENCY) {
+    return (await markOrderPaid({
+      providerOrderId: record.payment.providerOrderId,
+      providerPaymentId: paid.id,
+      method: paid.method,
+      source: "reconciliation",
+      expectedUserId: userId,
+    })).state;
+  }
+
+  if (!record.order.reservedUntil || record.order.reservedUntil > new Date()) {
+    return "still_pending" as const;
+  }
+  return db.transaction(async (tx) => {
+    const [cancelled] = await tx.update(orders).set({
+      status: "cancelled",
+      paymentStatus: "expired",
+      reservedUntil: null,
+      updatedAt: new Date(),
+    }).where(and(eq(orders.id, orderId), eq(orders.userId, userId), eq(orders.status, "pending_payment")))
+      .returning({ id: orders.id });
+    if (!cancelled) return "already_processed" as const;
+    await releaseReservedStock(tx, orderId);
+    await tx.update(payments).set({ status: "expired", updatedAt: new Date() }).where(eq(payments.id, record.payment.id));
+    return "expired" as const;
+  });
+}
