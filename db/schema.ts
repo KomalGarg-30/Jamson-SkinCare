@@ -20,6 +20,7 @@ const timestamps = {
 };
 
 export const userRole = pgEnum("user_role", ["user", "admin"]);
+export const emailOtpPurpose = pgEnum("email_otp_purpose", ["signup", "password_reset"]);
 export const orderStatus = pgEnum("order_status", ["pending", "confirmed", "shipped", "delivered", "cancelled"]);
 export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "failed", "refunded"]);
 export const returnStatus = pgEnum("return_status", ["requested", "approved", "rejected", "picked_up", "received", "refunded"]);
@@ -28,6 +29,8 @@ export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 120 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
+  emailVerified: boolean("email_verified").default(true).notNull(),
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   passwordHash: text("password_hash").notNull(),
   phone: varchar("phone", { length: 30 }),
   role: userRole("role").default("user").notNull(),
@@ -283,6 +286,24 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   usedAt: timestamp("used_at", { withTimezone: true }),
   ...timestamps,
 }, (table) => [index("reset_tokens_user_idx").on(table.userId)]);
+
+export const emailOtps = pgTable("email_otps", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  purpose: emailOtpPurpose("purpose").notNull(),
+  otpHash: text("otp_hash").notNull(),
+  attempts: integer("attempts").default(0).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  lastSentAt: timestamp("last_sent_at", { withTimezone: true }).notNull(),
+  resendCount: integer("resend_count").default(0).notNull(),
+  resendWindowStart: timestamp("resend_window_start", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("email_otps_email_purpose_idx").on(table.email, table.purpose),
+  index("email_otps_expires_at_idx").on(table.expiresAt),
+]);
 
 export const rateLimitBuckets = pgTable("rate_limit_buckets", {
   key: text("key").primaryKey(),

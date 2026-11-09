@@ -39,7 +39,7 @@ async function seed() {
     const categoryId = savedCategories.get(categorySlug);
     if (!categoryId) throw new Error(`Missing seeded category: ${categorySlug}`);
     const [product] = await db.insert(products).values({
-      name, slug, categoryId, description, ingredients, howToUse, brand: "Jamson",
+      name, slug, categoryId, description, ingredients, howToUse, brand: "Decotrin",
       price, discountPrice, stock, sku, featured, tags: [categorySlug.replace("-", " "), "daily care"],
     }).onConflictDoUpdate({
       target: products.sku,
@@ -55,7 +55,7 @@ async function seed() {
     }
   }
   for (const [key, value] of [
-    ["store_name", "Jamson Wellness"], ["shipping_charge", "9900"],
+    ["store_name", "Decotrin"], ["shipping_charge", "9900"],
     ["free_shipping_threshold", "200000"], ["tax_percent", "0"],
     ["return_window_days", process.env.RETURN_WINDOW_DAYS || "7"],
   ]) {

@@ -1,12 +1,28 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, eq, ne } from "drizzle-orm";
-import { NextResponse } from "next/server";
-import { orders, payments, returns, webhookEvents } from "@/db/schema";
+import { after, NextResponse } from "next/server";
+import { orders, payments, returns, users, webhookEvents } from "@/db/schema";
 import { requireEnv } from "@/lib/env";
 import { db } from "@/lib/db";
 import { errorResponse } from "@/lib/api";
+import { sendEmail } from "@/lib/email";
+import { orderEmail } from "@/lib/email-templates";
 
 type JsonRecord = Record<string, unknown>;
+
+function scheduleOrderEmail(userId: string, kind: "confirmation" | "refund_processed", details: string) {
+  after(async () => {
+    try {
+      const [customer] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+      if (customer) {
+        const content = orderEmail(kind, details);
+        await sendEmail({ to: customer.email, ...content });
+      }
+    } catch (error) {
+      console.error("Payment email notification failed.", { name: error instanceof Error ? error.name : "UnknownError" });
+    }
+  });
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -53,20 +69,27 @@ export async function POST(request: Request) {
         const [acceptedEvent] = await tx.insert(webhookEvents).values({
           eventId, eventType: event.event as string,
         }).onConflictDoNothing().returning({ eventId: webhookEvents.eventId });
-        if (!acceptedEvent) return false;
+        if (!acceptedEvent) return { accepted: false, userId: undefined, orderId: undefined };
         const [record] = await tx.select().from(payments).innerJoin(orders, eq(payments.orderId, orders.id))
           .where(eq(payments.providerOrderId, providerOrderId)).limit(1);
-        if (!record || record.payments.amount !== amount || record.orders.status === "cancelled") return true;
+        if (!record || record.payments.amount !== amount || record.orders.status === "cancelled") {
+          return { accepted: true, userId: undefined, orderId: undefined };
+        }
         const [updatedOrder] = await tx.update(orders).set({
           paymentStatus: "paid", status: "confirmed", updatedAt: new Date(),
-        }).where(and(eq(orders.id, record.orders.id), ne(orders.status, "cancelled"))).returning({ id: orders.id });
-        if (!updatedOrder) return true;
+        }).where(and(
+          eq(orders.id, record.orders.id), eq(orders.paymentStatus, "pending"), ne(orders.status, "cancelled"),
+        )).returning({ id: orders.id });
+        if (!updatedOrder) return { accepted: true, userId: undefined, orderId: undefined };
         await tx.update(payments).set({
           providerPaymentId, status: "paid", updatedAt: new Date(),
-        }).where(eq(payments.id, record.payments.id));
-        return true;
+        }).where(and(eq(payments.id, record.payments.id), eq(payments.status, "pending")));
+        return { accepted: true, userId: record.orders.userId, orderId: record.orders.id };
       });
-      if (!processed) return NextResponse.json({ received: true, duplicate: true });
+      if (!processed.accepted) return NextResponse.json({ received: true, duplicate: true });
+      if (processed.userId && processed.orderId) {
+        scheduleOrderEmail(processed.userId, "confirmation", `Your order ${processed.orderId} has been confirmed and payment was received.`);
+      }
     } else if (event.event === "payment.failed") {
       const payload = isRecord(event.payload) ? event.payload : null;
       const paymentPayload = payload && isRecord(payload.payment) ? payload.payment : null;
@@ -106,19 +129,23 @@ export async function POST(request: Request) {
         const [acceptedEvent] = await tx.insert(webhookEvents).values({
           eventId, eventType: event.event as string,
         }).onConflictDoNothing().returning({ eventId: webhookEvents.eventId });
-        if (!acceptedEvent) return false;
+        if (!acceptedEvent) return { accepted: false, returnRecord: undefined };
         const now = new Date();
-        await tx.update(returns).set({ status: "refunded", refundedAt: now, updatedAt: now })
-          .where(eq(returns.providerRefundId, refundId));
+        const [returnRecord] = await tx.update(returns).set({ status: "refunded", refundedAt: now, updatedAt: now })
+          .where(and(eq(returns.providerRefundId, refundId), eq(returns.status, "received")))
+          .returning({ id: returns.id, userId: returns.userId });
         const [payment] = await tx.select().from(payments).where(eq(payments.providerPaymentId, providerPaymentId)).limit(1);
         if (payment && payment.amount === amount) {
           await tx.update(payments).set({ status: "refunded", updatedAt: now }).where(eq(payments.id, payment.id));
           await tx.update(orders).set({ paymentStatus: "refunded", updatedAt: now })
             .where(eq(orders.id, payment.orderId));
         }
-        return true;
+        return { accepted: true, returnRecord };
       });
-      if (!processed) return NextResponse.json({ received: true, duplicate: true });
+      if (!processed.accepted) return NextResponse.json({ received: true, duplicate: true });
+      if (processed.returnRecord) {
+        scheduleOrderEmail(processed.returnRecord.userId, "refund_processed", `The refund for return ${processed.returnRecord.id} has been processed.`);
+      }
     } else {
       const [acceptedEvent] = await db.insert(webhookEvents).values({
         eventId, eventType: event.event,

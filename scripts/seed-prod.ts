@@ -14,7 +14,7 @@ async function seedProduction() {
       .onConflictDoUpdate({ target: categories.slug, set: { ...category, updatedAt: new Date() } });
   }
   for (const [key, value] of [
-    ["store_name", process.env.STORE_NAME || "Jamson Wellness"],
+    ["store_name", process.env.STORE_NAME || "Decotrin"],
     ["shipping_charge", "9900"],
     ["free_shipping_threshold", "200000"],
     ["tax_percent", "0"],

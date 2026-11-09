@@ -1,16 +1,17 @@
-# Jamson Wellness Store
+# Decotrin
 
 A full-stack skincare, haircare, bodycare and wellness storefront built with Next.js App Router, TypeScript, Tailwind CSS, Drizzle ORM and Neon PostgreSQL. The customer portal, admin area and API routes all run in one Next.js application.
 
 ## Project structure
 
 ```text
-Jamson/
+Decotrin/
 ├── app/
 │   ├── admin/                 # Protected dashboard and admin sections
 │   ├── api/                   # Auth, catalog, cart, checkout and admin route handlers
 │   ├── cart/ checkout/        # Cart and multi-step checkout
-│   ├── login/ signup/         # Account and password recovery pages
+│   ├── login/ signup/         # Sign-in and verified account creation
+│   ├── verify-email/ verify-otp/ forgot-password/ reset-password/
 │   ├── account/ orders/ profile/ # Customer account, orders and profile pages
 │   ├── products/ shop/        # Product detail and listing pages
 │   ├── globals.css layout.tsx # Global styling, SEO defaults and shared shell
@@ -21,7 +22,7 @@ Jamson/
 ├── db/
 │   └── schema.ts              # Normalized PostgreSQL schema
 ├── drizzle/                   # Generated SQL migrations
-├── lib/                       # Auth, database, validation, email and helpers
+├── lib/                       # Auth, OTP, Resend email, database and helpers
 ├── public/images/             # Local product/category illustration fallbacks
 ├── scripts/seed.ts            # Repeatable sample catalog seed
 ├── .env                       # Local environment template (ignored by Git)
@@ -37,14 +38,14 @@ Jamson/
 - npm
 - A Neon PostgreSQL project
 - ImageKit and Razorpay credentials for image upload and online payments
-- SMTP credentials to enable password reset email delivery
+- A Resend account and verified sender domain for signup and password-reset OTP email
 
 ## Setup
 
 1. **Create Neon database credentials.** Create a project at [Neon](https://neon.tech/), open **Connect**, and copy its PostgreSQL connection string. Use the pooled connection string and keep `sslmode=require`.
 2. **Configure image uploads.** Create a free [ImageKit](https://imagekit.io/) account and open **Developer options → API keys** in the dashboard. Copy the public key and private key there, and copy the URL endpoint shown for your media library (for example, `https://ik.imagekit.io/your_id`). Paste these into the matching `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, and `IMAGEKIT_URL_ENDPOINT` entries in `.env`. Also set `NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY` to the same public key and `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` to the same endpoint; these two values are safe for browser use. Never put the private key in a `NEXT_PUBLIC_` variable or expose it to the browser. The upload folder, 5 MB image limit, and 8-image product limit have defaults and can be changed with `IMAGEKIT_UPLOAD_FOLDER`, `MAX_IMAGE_SIZE_MB`, and `MAX_IMAGES_PER_PRODUCT`.
 3. **Configure payments.** Create a [Razorpay](https://razorpay.com/) account and obtain the test or live Key ID and Key Secret from **Account & Settings → API Keys**. Add a webhook pointing to `https://YOUR_APP_HOST/api/webhooks/razorpay`, subscribe to `payment.captured`, `payment.failed`, and `refund.processed`, and copy its webhook secret.
-4. **Configure email (optional until needed).** Add SMTP host, port, user, password and a verified sender address from your email provider to enable password reset emails. The store can be deployed without these values.
+4. **Configure Resend email.** Create an account at [Resend](https://resend.com), create an API key from **API Keys**, then add a domain in **Domains**. Publish the SPF and DKIM DNS records Resend provides at your DNS host; add a DMARC record as recommended. Wait for Resend to verify the domain. Set `EMAIL_FROM` to `Decotrin <noreply@decotrin.com>`; for testing only, `onboarding@resend.dev` can send only to your own Resend account email. Set `EMAIL_REPLY_TO` to your support address.
 5. Copy `.env.example` to `.env` (or use the included `.env` template) and fill in the values:
 
    ```dotenv
@@ -64,17 +65,18 @@ Jamson/
    RAZORPAY_KEY_SECRET=
    NEXT_PUBLIC_RAZORPAY_KEY_ID=
    RAZORPAY_WEBHOOK_SECRET=
-   EMAIL_HOST=
-   EMAIL_PORT=587
-   EMAIL_USER=
-   EMAIL_PASSWORD=
-   EMAIL_FROM=
-   STORE_NAME=Jamson Wellness
+   RESEND_API_KEY=
+   EMAIL_FROM=Decotrin <noreply@decotrin.com>
+   EMAIL_REPLY_TO=support@yourdomain.com
+   OTP_LENGTH=6
+   OTP_EXPIRY_MINUTES=1
+   OTP_RESEND_COOLDOWN_SECONDS=60
+   STORE_NAME=Decotrin
    CURRENCY=INR
    RETURN_WINDOW_DAYS=7
    ```
 
-   Generate `JWT_SECRET` with a secure random generator (for example `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`). `DATABASE_URL` and `JWT_SECRET` are required for the store; ImageKit, Razorpay, SMTP, and cron credentials can be added later to enable their corresponding features. Never commit `.env`; `.gitignore` excludes it. The app reports when a feature needs missing configuration.
+   Generate `JWT_SECRET` with a secure random generator (for example `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`). `DATABASE_URL` and `JWT_SECRET` are required for the store; add `RESEND_API_KEY` and a verified `EMAIL_FROM` before using signup or password recovery. Never commit `.env`; `.gitignore` excludes it. The app reports when email configuration is missing.
 
 6. Install dependencies, create the schema, seed sample products and start the entire app:
 
@@ -136,14 +138,33 @@ After the first administrator exists, use **Admin → Users** to promote other r
 ## Main capabilities
 
 - Public catalog with category, search, price, rating, popularity and newest filters; pagination; product details, ratings and approved reviews.
-- Customer signup/sign-in, HTTP-only signed session cookie, rate-limited auth endpoints, password reset tokens and SMTP email.
-- In local development, the forgot-password form displays a one-time reset link instead of requiring SMTP. In production, reset links are sent by email and are never returned by the API.
+- Signup with email OTP verification before an account session is created; unverified accounts cannot sign in.
+- Forgot password with email OTP verification, short-lived single-use reset tokens, and session invalidation after a password change.
+- Rate-limited, purpose-specific OTPs with server-enforced resend cooldowns and expiry, sent through Resend.
 - Database-backed cart, wishlist, saved delivery addresses, COD and Razorpay checkout, order history, invoice PDF downloads, order cancellation before shipment and returns/refunds.
 - Server-side price/tax/shipping/coupon calculation, conditional stock decrements inside a PostgreSQL transaction, server verification of Razorpay signatures, and webhook handling.
 - Admin catalog and category management, signed ImageKit product uploads, ImageKit-hosted return-photo uploads, order/customer/user/return/review/coupon/banner/settings management, low-stock indicators and sales chart.
 - Responsive layouts, accessible labels, loading/empty/error states, metadata, sitemap and robots policy.
 
 Prices are stored as integer paise. Store settings for shipping and tax can be edited in **Admin → Settings**. Product image upload requires the ImageKit values; Razorpay checkout requires all Razorpay keys and webhook configuration. Cash on delivery remains available independently. Admin upload authentication, file ownership/folder checks, image-size limits, image-count limits and image deletion are verified on the server.
+
+## Email OTP manual test checklist
+
+- Signup and verify with the correct OTP; confirm the user is logged in only after verification.
+- Enter a wrong OTP; confirm the remaining-attempt message, and verify that the fifth wrong attempt locks that code.
+- Use an expired OTP and confirm the page explains that it expired.
+- Request a resend before 60 seconds; confirm the server returns HTTP 429 with the remaining wait. After 60 seconds, resend and confirm the previous code no longer works.
+- Refresh the verification page and confirm the countdown reflects the server's `lastSentAt`.
+- Complete the forgot-password OTP and set-password flow; confirm existing sessions are invalidated.
+- Submit an unregistered email and confirm the same generic message: “If this email is registered, an OTP has been sent”.
+- Try a blocked/deleted account and confirm no OTP is delivered.
+
+## Email deployment steps
+
+1. Create a Resend account and an API key under **API Keys**.
+2. Add your sending domain in Resend and publish the provided SPF and DKIM DNS records. Add DMARC if available, then wait for domain verification.
+3. Set `EMAIL_FROM` to an address on the verified domain and `EMAIL_REPLY_TO` to your support address.
+4. Add `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO`, and the `OTP_*` values to the local `.env` or Vercel project's **Settings → Environment Variables**. Keep the API key server-only and redeploy after Vercel changes.
 
 ## Security notes
 

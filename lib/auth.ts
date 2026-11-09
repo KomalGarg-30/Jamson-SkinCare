@@ -40,9 +40,12 @@ export async function getSession(): Promise<SessionUser | null> {
 export async function requireUser() {
   const session = await getSession();
   if (!session) throw new Error("UNAUTHORIZED");
-  const [user] = await db.select({ id: users.id, isBlocked: users.isBlocked, role: users.role, sessionVersion: users.sessionVersion, deletedAt: users.deletedAt })
+  const [user] = await db.select({
+    id: users.id, isBlocked: users.isBlocked, emailVerified: users.emailVerified,
+    role: users.role, sessionVersion: users.sessionVersion, deletedAt: users.deletedAt,
+  })
     .from(users).where(eq(users.id, session.id)).limit(1);
-  if (!user || user.isBlocked || user.deletedAt || user.sessionVersion !== session.sessionVersion) throw new Error("UNAUTHORIZED");
+  if (!user || user.isBlocked || !user.emailVerified || user.deletedAt || user.sessionVersion !== session.sessionVersion) throw new Error("UNAUTHORIZED");
   return { ...session, role: user.role };
 }
 
@@ -55,8 +58,11 @@ export async function requireAdmin() {
 export async function requireAdminPage() {
   const user = await getSession();
   if (!user) redirect("/login?next=/admin");
-  const [record] = await db.select({ role: users.role, isBlocked: users.isBlocked, sessionVersion: users.sessionVersion, deletedAt: users.deletedAt })
+  const [record] = await db.select({
+    role: users.role, isBlocked: users.isBlocked, emailVerified: users.emailVerified,
+    sessionVersion: users.sessionVersion, deletedAt: users.deletedAt,
+  })
     .from(users).where(eq(users.id, user.id)).limit(1);
-  if (!record || record.isBlocked || record.deletedAt || record.sessionVersion !== user.sessionVersion || record.role !== "admin") redirect("/");
+  if (!record || record.isBlocked || !record.emailVerified || record.deletedAt || record.sessionVersion !== user.sessionVersion || record.role !== "admin") redirect("/");
   return user;
 }

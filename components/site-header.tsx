@@ -44,7 +44,7 @@ export function SiteHeader() {
   return <header className="sticky top-0 z-40 border-b border-ink/5 bg-cream/95 backdrop-blur">
     <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-5 py-4 lg:px-8">
       <button className="lg:hidden" aria-label="Toggle navigation" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</button>
-      <Link href="/" className="font-serif text-2xl font-semibold tracking-tight text-sage-dark">jamson<span className="text-rose">.</span></Link>
+      <Link href="/" className="font-serif text-2xl font-semibold tracking-tight text-sage-dark">decotrin<span className="text-rose">.</span></Link>
       <div className="hidden lg:block">{nav}</div>
       <div className="flex items-center gap-3">
         <form onSubmit={search} className="hidden items-center rounded-full border border-ink/10 bg-white px-3 py-2 xl:flex">

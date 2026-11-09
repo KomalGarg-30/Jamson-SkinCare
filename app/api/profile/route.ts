@@ -5,6 +5,7 @@ import { auditLogs, users } from "@/db/schema";
 import { requireUser, createSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { errorResponse } from "@/lib/api";
+import { passwordSchema } from "@/lib/validation";
 import { z } from "zod";
 
 export async function GET() {
@@ -25,7 +26,7 @@ export async function PATCH(request: Request) {
       name: z.string().trim().min(2).max(120).optional(),
       phone: z.string().trim().min(7).max(30).or(z.literal("")).nullable().optional(),
       email: z.email().trim().toLowerCase().optional(),
-      currentPassword: z.string().optional(), newPassword: z.string().min(10).max(128).optional(),
+      currentPassword: z.string().optional(), newPassword: passwordSchema.optional(),
     }).refine((value) => Boolean(value.name || value.phone !== undefined || value.email || value.newPassword), "Update at least one profile field.");
     const data = schema.parse(await request.json());
     const [record] = await db.select().from(users).where(eq(users.id, session.id)).limit(1);

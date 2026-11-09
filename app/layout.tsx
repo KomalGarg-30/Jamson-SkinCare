@@ -5,13 +5,13 @@ import { SiteHeader } from "@/components/site-header";
 import { ToastProvider } from "@/components/toast-provider";
 
 export const metadata: Metadata = {
-  title: { default: "Jamson Wellness | Thoughtful care, every day", template: "%s | Jamson Wellness" },
+  title: { default: "Decotrin | Thoughtful care, every day", template: "%s | Decotrin" },
   description: "Shop thoughtfully chosen skincare, haircare, bodycare and everyday wellness essentials.",
-  openGraph: { title: "Jamson Wellness", description: "Thoughtful care, every day.", type: "website" },
+  openGraph: { title: "Decotrin", description: "Thoughtful care, every day.", type: "website" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const storeName = process.env.STORE_NAME || "Jamson Wellness";
+  const storeName = process.env.STORE_NAME || "Decotrin";
   return <html lang="en"><body>
     <ToastProvider><SiteHeader /><main>{children}</main>
       <footer className="mt-24 bg-ink px-6 py-14 text-white">

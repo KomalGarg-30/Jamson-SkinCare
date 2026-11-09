@@ -4,7 +4,7 @@ This project is configured for Vercel's Next.js runtime and Neon PostgreSQL. Ver
 
 ## Prerequisites
 
-Create accounts for GitHub, Vercel, and Neon. ImageKit, Razorpay, and an SMTP/email provider are needed only when enabling their corresponding optional features. Upstash is reserved for a future limiter; the application currently uses PostgreSQL-backed rate limiting.
+Create accounts for GitHub, Vercel, Neon, and Resend. ImageKit and Razorpay are needed only when enabling their corresponding features. OTP rate limits use Upstash Redis when configured and fall back to PostgreSQL.
 
 ## 1. Push the repository to GitHub
 
@@ -12,7 +12,7 @@ If this is a new repository, create an empty GitHub repository first, then run f
 
 ```bash
 git add .
-git commit -m "Prepare Jamson for Vercel deployment"
+git commit -m "Prepare Decotrin for Vercel deployment"
 git branch -M main
 git remote add origin https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPOSITORY.git
 git push -u origin main
@@ -67,7 +67,17 @@ In Vercel, choose **Add New → Project**, import the GitHub repository, and con
 
 Do not set a standalone or static export output. `vercel.json` selects Mumbai, configures function limits, security headers, and the daily cleanup cron.
 
-## 5. Configure environment variables
+## 5. Set up Resend email
+
+Email is required for verified signup and password recovery:
+
+1. Create an account at [Resend](https://resend.com) and create an API key in **API Keys**.
+2. In Resend **Domains**, add the domain you will send from. Publish the exact SPF and DKIM DNS records Resend displays at your domain registrar. Add a DMARC record as recommended for your domain.
+3. Wait until Resend reports the domain as verified.
+4. Choose `EMAIL_FROM` on that domain, for example `Decotrin <noreply@decotrin.com>`. For testing only, `onboarding@resend.dev` is limited to sending to the email address of your own Resend account. Set `EMAIL_REPLY_TO` to your support inbox.
+5. Add the values in Vercel as described in the next section. `RESEND_API_KEY` is a server-only secret; never use a `NEXT_PUBLIC_` prefix.
+
+## 6. Configure environment variables
 
 Add these in **Project Settings → Environment Variables**. Use test Razorpay credentials for Preview and Development; use live Razorpay keys only in Production. Vercel sets `NODE_ENV` and `VERCEL_URL` automatically. Environment variables used by the build must be present before the first deployment.
 
@@ -91,22 +101,23 @@ Add these in **Project Settings → Environment Variables**. Use test Razorpay c
 | `RAZORPAY_KEY_SECRET` | Razorpay dashboard → API Keys; server-only | Online payments/refunds |
 | `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Same environment's Razorpay Key ID | Online payments |
 | `RAZORPAY_WEBHOOK_SECRET` | The secret configured for the Razorpay webhook | Online payment webhooks |
-| `EMAIL_HOST` | SMTP provider | Password reset email |
-| `EMAIL_PORT` | SMTP provider (commonly `587`) | Password reset email; defaults to `587` |
-| `EMAIL_USER` | SMTP provider | Password reset email |
-| `EMAIL_PASSWORD` | SMTP provider password/API credential | Password reset email |
-| `EMAIL_FROM` | Verified sender address from the email provider | Password reset email |
+| `RESEND_API_KEY` | Resend dashboard → API Keys; server-only | Required for auth email |
+| `EMAIL_FROM` | Sender on a verified Resend domain, e.g. `Decotrin <noreply@decotrin.com>` | Required for auth email |
+| `EMAIL_REPLY_TO` | Customer-support email address | Optional |
+| `OTP_LENGTH` | OTP digits; defaults to `6` | No |
+| `OTP_EXPIRY_MINUTES` | OTP validity; defaults to `1` minute | No |
+| `OTP_RESEND_COOLDOWN_SECONDS` | Server-enforced resend cooldown; defaults to `60` | No |
 | `RETURN_WINDOW_DAYS` | Number of days after delivery to allow a return; defaults to `7` | No |
 | `STORE_NAME` | Your customer-facing store name | No |
 | `CURRENCY` | ISO currency code, e.g. `INR` | No |
-| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST API page; reserved for a future Upstash limiter | No |
-| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST API page; reserved for a future Upstash limiter | No |
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST API URL; enables shared distributed rate limits | Recommended |
+| `UPSTASH_REDIS_REST_TOKEN` | Matching Upstash Redis REST token | Recommended |
 | `AUDIT_LOG_RETENTION_DAYS` | Optional retention in days; unset preserves audit history indefinitely | No |
 | `VERCEL_URL` | Supplied automatically by Vercel; fallback when constructing absolute URLs | No |
 
-`DATABASE_URL` and `JWT_SECRET` are required for the store; Vercel provides `VERCEL_URL` for absolute links, though `NEXT_PUBLIC_APP_URL` should be set for a custom domain. Add integration variables when enabling their feature; missing credentials do not block the build, and the affected action reports that its configuration is needed. The scheduled cleanup endpoint remains disabled until `CRON_SECRET` is set. `DATABASE_URL_UNPOOLED` is needed only for database migrations. Set public variables for Production, Preview, and Development as appropriate, and never prefix private credentials with `NEXT_PUBLIC_`. Supplied values are still validated during the build without printing secret values.
+`DATABASE_URL` and `JWT_SECRET` are required for the store; email actions also require `RESEND_API_KEY` and `EMAIL_FROM`. Vercel provides `VERCEL_URL` for absolute links, though `NEXT_PUBLIC_APP_URL` should be set for a custom domain. The scheduled cleanup endpoint remains disabled until `CRON_SECRET` is set. `DATABASE_URL_UNPOOLED` is needed only for database migrations. Set variables for Production, Preview, and Development as appropriate, and never prefix private credentials with `NEXT_PUBLIC_`. Supplied values are validated without printing secret values.
 
-## 6. Configure Razorpay webhooks (optional)
+## 7. Configure Razorpay webhooks (optional)
 
 Skip this step until enabling Razorpay payments. After deploying and adding Razorpay credentials in Vercel, configure the webhook in the Razorpay dashboard:
 
@@ -116,11 +127,11 @@ Skip this step until enabling Razorpay payments. After deploying and adding Razo
 
 The webhook validates the raw request body signature and uses Razorpay's event ID to ignore duplicates. ImageKit uses the configured endpoint and API keys; if ImageKit restrictions are enabled, allow your production domain.
 
-## 7. Custom domain
+## 8. Custom domain
 
 Add the domain under **Vercel → Project → Settings → Domains**, then create the DNS records Vercel shows at your domain registrar. Once verified, set `NEXT_PUBLIC_APP_URL=https://<your-domain>` for the correct Vercel environments and redeploy.
 
-## 8. Promote the first administrator
+## 9. Promote the first administrator
 
 Create the account through the normal signup flow. In the production Neon SQL Editor, replace the example address with that account's email and run:
 
@@ -137,10 +148,11 @@ FROM promoted;
 
 Then sign in again to issue a fresh session. Other accounts can be promoted in **Admin → Users**.
 
-## 9. Post-deploy checklist
+## 10. Post-deploy checklist
 
 - `https://<your-domain>/api/health` returns `status: "ok"` and `database: "connected"`.
-- Signup, login, and password reset work.
+- Signup OTP, login, resend cooldown, and password-reset OTP work.
+- Resend confirms the verified sender domain and production delivery.
 - Admin product image upload, display, and deletion work.
 - Cart and checkout work; a Razorpay TEST payment creates an order and the webhook is received.
 - A COD order can be placed.

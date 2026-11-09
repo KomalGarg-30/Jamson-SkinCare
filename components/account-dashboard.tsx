@@ -231,7 +231,7 @@ export function AccountDashboard() {
             <label className="grid gap-1 text-sm sm:col-span-2">Phone<input className="field" name="phone" defaultValue={data.user.phone || ""} /></label>
             <div className="grid gap-3 border-t border-ink/10 pt-4 sm:col-span-2 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">Current password<input className="field" name="currentPassword" type="password" autoComplete="current-password" /></label>
-              <label className="grid gap-1 text-sm">New password<input className="field" name="newPassword" type="password" minLength={10} autoComplete="new-password" /></label>
+              <label className="grid gap-1 text-sm">New password<input className="field" name="newPassword" type="password" minLength={10} autoComplete="new-password" /><span className="text-xs text-ink/55">Use 10+ characters with uppercase, lowercase, a number, and a special character.</span></label>
             </div>
             <p className="text-xs text-ink/55 sm:col-span-2">Last login: {data.user.lastLoginAt ? new Date(data.user.lastLoginAt).toLocaleString() : "Not available"}</p>
             <button disabled={busy} className="rounded-full bg-sage px-4 py-2 text-sm text-white sm:col-span-2">Save changes</button>

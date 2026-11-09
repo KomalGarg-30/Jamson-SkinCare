@@ -11,10 +11,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const [product] = await db.select({ name: products.name, description: products.description })
     .from(products).where(eq(products.slug, slug)).limit(1);
   const title = product?.name || slug.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-  const description = product?.description || "Thoughtful everyday care from Jamson Wellness.";
+  const description = product?.description || "Thoughtful everyday care from Decotrin.";
   return {
     title, description,
-    openGraph: { title: `${title} | Jamson Wellness`, description, type: "website" },
+    openGraph: { title: `${title} | Decotrin`, description, type: "website" },
   };
 }
 

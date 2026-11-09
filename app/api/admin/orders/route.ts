@@ -1,10 +1,12 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { orders, orderItems, payments, products, users } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { errorResponse } from "@/lib/api";
 import { z } from "zod";
+import { sendEmail } from "@/lib/email";
+import { orderEmail } from "@/lib/email-templates";
 
 export async function GET(request: Request) {
   try {
@@ -31,9 +33,11 @@ export async function PATCH(request: Request) {
       paymentStatus: z.enum(["pending", "paid", "failed", "refunded"]).optional(),
     }).refine((value) => value.status || value.paymentStatus).parse(await request.json());
     const { id, ...updates } = data;
+    let statusChanged = false;
     const order = await db.transaction(async (tx) => {
       const [previous] = await tx.select().from(orders).where(eq(orders.id, id)).limit(1);
       if (!previous) return undefined;
+      statusChanged = Boolean(updates.status && updates.status !== previous.status);
       if (updates.status === "cancelled" && previous.status !== "cancelled") {
         const [cancelled] = await tx.update(orders).set({ ...updates, updatedAt: new Date() })
           .where(and(eq(orders.id, id), inArray(orders.status, ["pending", "confirmed"]))).returning();
@@ -61,6 +65,20 @@ export async function PATCH(request: Request) {
       return updated;
     });
     if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
+    if (statusChanged && (order.status === "shipped" || order.status === "delivered")) {
+      after(async () => {
+        try {
+          const [customer] = await db.select({ email: users.email }).from(orders)
+            .innerJoin(users, eq(orders.userId, users.id)).where(eq(orders.id, order.id)).limit(1);
+          if (customer) {
+            const content = orderEmail(order.status === "shipped" ? "shipped" : "delivered", `Order ${order.id} is ${order.status}.`);
+            await sendEmail({ to: customer.email, ...content });
+          }
+        } catch (error) {
+          console.error("Order update email failed.", { name: error instanceof Error ? error.name : "UnknownError" });
+        }
+      });
+    }
     return NextResponse.json({ order });
   } catch (error) {
     return errorResponse(error);

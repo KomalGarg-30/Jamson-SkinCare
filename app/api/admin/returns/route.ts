@@ -1,10 +1,12 @@
 import { desc, eq, inArray, sql } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { auditLogs, orderItems, orders, products, returnItems, returns, users } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { errorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
 import { z } from "zod";
+import { sendEmail } from "@/lib/email";
+import { orderEmail } from "@/lib/email-templates";
 
 export async function GET(request: Request) {
   try {
@@ -45,6 +47,7 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const { id } = z.object({ id: z.uuid() }).parse(body);
     const data = updateSchema.parse(body);
+    let statusChanged = false;
     const result = await db.transaction(async (tx) => {
       const [record] = await tx.select().from(returns).where(eq(returns.id, id)).for("update").limit(1);
       if (!record) return { error: "Return request not found.", status: 404 as const };
@@ -60,6 +63,7 @@ export async function PATCH(request: Request) {
         }
       }
       const nextStatus = data.status ?? record.status;
+      statusChanged = Boolean(data.status && data.status !== record.status);
       const restoreStock = data.restoreStock === true && nextStatus === "received" && !record.stockRestored;
       if (data.restoreStock && nextStatus !== "received") {
         return { error: "Stock can only be restored when the returned items are received.", status: 409 as const };
@@ -91,6 +95,21 @@ export async function PATCH(request: Request) {
       return { record: updated };
     });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+    const newStatus = data.status;
+    if (statusChanged && newStatus) {
+      after(async () => {
+        try {
+          const [customer] = await db.select({ email: users.email }).from(users)
+            .where(eq(users.id, result.record.userId)).limit(1);
+          if (customer) {
+            const content = orderEmail("return_status", `Return ${result.record.id} has been updated to ${newStatus.replaceAll("_", " ")}.`);
+            await sendEmail({ to: customer.email, ...content });
+          }
+        } catch (error) {
+          console.error("Return status email failed.", { name: error instanceof Error ? error.name : "UnknownError" });
+        }
+      });
+    }
     return NextResponse.json({ return: result.record });
   } catch (error) {
     return errorResponse(error);

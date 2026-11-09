@@ -7,7 +7,7 @@ const schema = z.object({
   CRON_SECRET: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
   NEXT_PUBLIC_APP_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
   VERCEL_URL: z.string().optional(),
-  STORE_NAME: z.string().default("Jamson Wellness").transform((value) => value.trim() || "Jamson Wellness"),
+  STORE_NAME: z.string().default("Decotrin").transform((value) => value.trim() || "Decotrin"),
   CURRENCY: z.string().default("INR").transform((value) => value.trim().toUpperCase() || "INR"),
   IMAGEKIT_PUBLIC_KEY: z.string().optional(),
   IMAGEKIT_PRIVATE_KEY: z.string().optional(),
@@ -21,11 +21,14 @@ const schema = z.object({
   RAZORPAY_KEY_SECRET: z.string().optional(),
   NEXT_PUBLIC_RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
-  EMAIL_HOST: z.string().optional(),
-  EMAIL_PORT: z.preprocess((value) => value === "" || value === undefined ? 587 : value, z.coerce.number().int().min(1).max(65535)),
-  EMAIL_USER: z.string().optional(),
-  EMAIL_PASSWORD: z.string().optional(),
-  EMAIL_FROM: z.string().optional(),
+  RESEND_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().optional()),
+  EMAIL_FROM: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().min(1, "EMAIL_FROM is required to send email.").optional()),
+  EMAIL_REPLY_TO: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().email("EMAIL_REPLY_TO must be a valid support email.").optional()),
+  OTP_LENGTH: z.preprocess((value) => value === "" || value === undefined ? 6 : value, z.coerce.number().int().min(4).max(8)),
+  OTP_EXPIRY_MINUTES: z.preprocess((value) => value === "" || value === undefined ? 1 : value, z.coerce.number().int().min(1).max(60)),
+  OTP_RESEND_COOLDOWN_SECONDS: z.preprocess((value) => value === "" || value === undefined ? 60 : value, z.coerce.number().int().min(1).max(3600)),
+  UPSTASH_REDIS_REST_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
+  UPSTASH_REDIS_REST_TOKEN: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
   RETURN_WINDOW_DAYS: z.preprocess((value) => value === "" || value === undefined ? 7 : value, z.coerce.number().int().min(1).max(365)),
   AUDIT_LOG_RETENTION_DAYS: z.preprocess((value) => value === "" || value === undefined ? undefined : value, z.coerce.number().int().min(30).max(3650).optional()),
 });
@@ -39,6 +42,8 @@ function deploymentIssues(data: z.infer<typeof schema>) {
     if (data.DATABASE_URL_UNPOOLED && new URL(data.DATABASE_URL_UNPOOLED).hostname.includes("-pooler")) {
       missing.push("DATABASE_URL_UNPOOLED (must be the Neon direct, non-pooled connection string)");
     }
+    if (!data.RESEND_API_KEY) missing.push("RESEND_API_KEY (create one in Resend)");
+    if (!data.EMAIL_FROM) missing.push("EMAIL_FROM (use a verified Resend sender)");
   }
   return missing;
 }
@@ -71,6 +76,19 @@ export function requireEnv<K extends keyof ReturnType<typeof getEnv>>(key: K): N
     throw new Error(`${String(key)} is required for this feature. Add it to .env and restart the app.`);
   }
   return value as NonNullable<ReturnType<typeof getEnv>[K]>;
+}
+
+export function getEmailConfig() {
+  const env = getEnv();
+  const apiKey = env.RESEND_API_KEY?.trim();
+  const from = env.EMAIL_FROM?.trim();
+  if (!apiKey) {
+    throw new Error("Email is not configured. Add RESEND_API_KEY from your Resend dashboard to .env and restart the app.");
+  }
+  if (!from) {
+    throw new Error("Email is not configured. Add EMAIL_FROM using a sender address verified in Resend to .env and restart the app.");
+  }
+  return { ...env, RESEND_API_KEY: apiKey, EMAIL_FROM: from };
 }
 
 export function getAppUrl() {

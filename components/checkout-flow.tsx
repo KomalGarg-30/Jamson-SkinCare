@@ -93,7 +93,7 @@ export function CheckoutFlow() {
     }
     const razorpay = new window.Razorpay({
       key: result.razorpay.keyId, amount: result.total || 0, currency: result.razorpay.currency,
-      name: "Jamson Wellness", description: "Your thoughtful everyday care", order_id: result.razorpay.orderId,
+      name: "Decotrin", description: "Your thoughtful everyday care", order_id: result.razorpay.orderId,
       handler: async (payment) => {
         const verification = await fetch("/api/payments/verify", {
           method: "POST", headers: { "content-type": "application/json" },

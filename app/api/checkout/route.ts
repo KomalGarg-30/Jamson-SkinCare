@@ -7,6 +7,8 @@ import { requireEnv } from "@/lib/env";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { errorResponse } from "@/lib/api";
+import { sendEmailAfterResponse } from "@/lib/email";
+import { orderEmail } from "@/lib/email-templates";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -95,6 +97,10 @@ export async function POST(request: Request) {
       });
       await tx.delete(cartItems).where(eq(cartItems.userId, user.id));
     });
+    if (input.paymentMethod === "cod") {
+      const email = orderEmail("confirmation", `Your order ${orderId} has been confirmed. You can review it in your account.`);
+      sendEmailAfterResponse({ to: user.email, ...email });
+    }
     return NextResponse.json({
       orderId, total, paymentMethod: input.paymentMethod,
       razorpay: providerOrderId && publicKey ? { orderId: providerOrderId, keyId: publicKey, currency: process.env.CURRENCY || "INR" } : null,

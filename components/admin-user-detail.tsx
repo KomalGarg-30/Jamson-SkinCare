@@ -72,16 +72,16 @@ export function AdminUserDetail() {
   }
 
   async function resetPassword() {
-    if (!window.confirm("Send a password reset email to this user?")) return;
+    if (!window.confirm("Send a password reset code to this user?")) return;
     setBusy(true);
     try {
       const response = await fetch(`/api/admin/users/${id}/reset-password`, { method: "POST" });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Could not send reset email.");
+      if (!response.ok) throw new Error(result.error || "Could not send reset code.");
       setError("");
-      window.alert("Password reset email sent.");
+      window.alert("Password reset code sent.");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not send reset email.");
+      setError(reason instanceof Error ? reason.message : "Could not send reset code.");
     } finally { setBusy(false); }
   }
 
@@ -98,7 +98,7 @@ export function AdminUserDetail() {
       <div className="flex flex-wrap gap-2">
         <button disabled={busy || Boolean(user.deletedAt)} onClick={() => void mutate({ action: "status", isBlocked: !user.isBlocked }, `Are you sure you want to ${user.isBlocked ? "unblock" : "block"} this user? Existing sessions will be invalidated.`)}
           className="rounded-full border border-ink/15 px-4 py-2 text-sm disabled:opacity-50">{user.isBlocked ? "Unblock" : "Block"} user</button>
-        <button disabled={busy || Boolean(user.deletedAt)} onClick={() => void resetPassword()} className="rounded-full border border-ink/15 px-4 py-2 text-sm disabled:opacity-50">Send reset email</button>
+        <button disabled={busy || Boolean(user.deletedAt) || user.isBlocked} onClick={() => void resetPassword()} className="rounded-full border border-ink/15 px-4 py-2 text-sm disabled:opacity-50">Send reset code</button>
         <button disabled={busy || Boolean(user.deletedAt)} onClick={() => void mutate({ action: "delete" }, "Soft-delete this account? Order history will be retained and all sessions invalidated.")}
           className="rounded-full bg-rose-700 px-4 py-2 text-sm text-white disabled:opacity-50">Delete user</button>
       </div>

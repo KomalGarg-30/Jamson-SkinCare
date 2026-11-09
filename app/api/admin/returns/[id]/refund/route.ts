@@ -1,12 +1,28 @@
 import Razorpay from "razorpay";
 import { and, eq, isNull } from "drizzle-orm";
-import { NextResponse } from "next/server";
-import { auditLogs, orders, payments, returns } from "@/db/schema";
+import { after, NextResponse } from "next/server";
+import { auditLogs, orders, payments, returns, users } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { errorResponse } from "@/lib/api";
 import { requireEnv } from "@/lib/env";
 import { db } from "@/lib/db";
 import { z } from "zod";
+import { sendEmail } from "@/lib/email";
+import { orderEmail } from "@/lib/email-templates";
+
+function scheduleRefundEmail(userId: string, returnId: string) {
+  after(async () => {
+    try {
+      const [customer] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+      if (customer) {
+        const content = orderEmail("refund_processed", `The refund for return ${returnId} has been processed.`);
+        await sendEmail({ to: customer.email, ...content });
+      }
+    } catch (error) {
+      console.error("Refund confirmation email failed.", { name: error instanceof Error ? error.name : "UnknownError" });
+    }
+  });
+}
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -51,7 +67,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     });
 
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
-    if (result.manual) return NextResponse.json({ return: result.record, message: "COD refund marked as issued. Complete the refund manually." });
+    if (result.manual) {
+      scheduleRefundEmail(result.record.userId, result.record.id);
+      return NextResponse.json({ return: result.record, message: "COD refund marked as issued. Complete the refund manually." });
+    }
 
     let refundId: string;
     try {
@@ -82,6 +101,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       return record;
     });
     if (!updated) return NextResponse.json({ error: `The refund was issued but the return record could not be finalized. Contact support with refund ${refundId}.` }, { status: 409 });
+    scheduleRefundEmail(updated.userId, updated.id);
     return NextResponse.json({ return: updated });
   } catch (error) {
     return errorResponse(error);

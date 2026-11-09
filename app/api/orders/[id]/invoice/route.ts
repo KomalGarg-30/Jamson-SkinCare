@@ -53,7 +53,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const address = typeof order.shippingAddress === "object" && order.shippingAddress !== null
       ? order.shippingAddress as Record<string, unknown> : {};
     const lines = [
-      "Jamson Wellness - Invoice",
+      "Decotrin - Invoice",
       `Order: ${order.id}`,
       `Date: ${order.createdAt.toISOString().slice(0, 10)}    Status: ${order.status}    Payment: ${order.paymentStatus}`,
       `Payment method: ${order.paymentMethod}`,
@@ -75,7 +75,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return new Response(new Uint8Array(pdf), {
       headers: {
         "content-type": "application/pdf",
-        "content-disposition": `attachment; filename="jamson-invoice-${id.slice(0, 8)}.pdf"`,
+        "content-disposition": `attachment; filename="decotrin-invoice-${id.slice(0, 8)}.pdf"`,
         "cache-control": "private, no-store",
       },
     });
