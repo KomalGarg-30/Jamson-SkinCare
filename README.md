@@ -44,7 +44,7 @@ Decotrin/
 
 1. **Create Neon database credentials.** Create a project at [Neon](https://neon.tech/), open **Connect**, and copy its PostgreSQL connection string. Use the pooled connection string and keep `sslmode=require`.
 2. **Configure image uploads.** Create a free [ImageKit](https://imagekit.io/) account and open **Developer options → API keys** in the dashboard. Copy the public key and private key there, and copy the URL endpoint shown for your media library (for example, `https://ik.imagekit.io/your_id`). Paste these into the matching `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, and `IMAGEKIT_URL_ENDPOINT` entries in `.env`. Also set `NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY` to the same public key and `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` to the same endpoint; these two values are safe for browser use. Never put the private key in a `NEXT_PUBLIC_` variable or expose it to the browser. The upload folder, 5 MB image limit, and 8-image product limit have defaults and can be changed with `IMAGEKIT_UPLOAD_FOLDER`, `MAX_IMAGE_SIZE_MB`, and `MAX_IMAGES_PER_PRODUCT`.
-3. **Configure payments.** Create a [Razorpay](https://razorpay.com/) account and obtain the test or live Key ID and Key Secret from **Account & Settings → API Keys**. Add a webhook pointing to `https://YOUR_APP_HOST/api/webhooks/razorpay`, subscribe to `payment.captured`, `payment.failed`, and `refund.processed`, and copy its webhook secret.
+3. **Configure payments.** Create a [Razorpay](https://razorpay.com/) account, complete KYC before going live, and find test/live Key IDs and Key Secrets under **Account & Settings → API Keys**. Set `RAZORPAY_MODE=test` locally and for Preview, and `live` only in Production. Create a webhook under **Settings → Webhooks**, use a new random webhook secret (different from the API Key Secret), point it to `https://YOUR_APP_HOST/api/webhooks/razorpay`, and enable `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`, `refund.created`, `refund.processed`, and `refund.failed`. Under **Payment Capture**, enable automatic capture so authorized payments are captured without an operator action.
 4. **Configure Resend email.** Create an account at [Resend](https://resend.com), create an API key from **API Keys**, then add a domain in **Domains**. Publish the SPF and DKIM DNS records Resend provides at your DNS host; add a DMARC record as recommended. Wait for Resend to verify the domain. Set `EMAIL_FROM` to `Decotrin <noreply@decotrin.com>`; for testing only, `onboarding@resend.dev` can send only to your own Resend account email. Set `EMAIL_REPLY_TO` to your support address.
 5. Copy `.env.example` to `.env` (or use the included `.env` template) and fill in the values:
 
@@ -75,6 +75,11 @@ Decotrin/
    OTP_RESEND_COOLDOWN_SECONDS=60
    STORE_NAME=Decotrin
    CURRENCY=INR
+   RAZORPAY_MODE=test
+   PAYMENT_PENDING_EXPIRY_MINUTES=15
+   COD_ENABLED=false
+   COD_MAX_ORDER_AMOUNT=0
+   COD_EXTRA_CHARGE=0
    RETURN_WINDOW_DAYS=7
    ```
 
@@ -90,6 +95,12 @@ Decotrin/
    ```
 
    Open `http://localhost:3000`. The seed adds four product categories and twelve sample products. Run `npm run db:push` again after schema changes.
+
+## Razorpay test checklist
+
+Use Razorpay test mode and its published test cards, UPI IDs `success@razorpay` and `failure@razorpay`, and test netbanking banks. Verify successful payment, failure and retry, modal dismissal, double-click protection, tampered signature and amount rejection, webhook-before-verify, webhook replay deduplication, wrong webhook signature (400), expiry releasing reserved stock, concurrent last-item checkout, full/partial refund, refund webhook, COD, cross-user payment access (403/404), and non-admin refund access (403).
+
+Before go-live, complete Razorpay KYC, apply the migration, configure the live webhook and events, set live keys only in Vercel Production, confirm auto-capture, place and refund one small real order, and monitor the first transactions. Admins can inspect payments at `/admin/payments`; customers can inspect their own history at `/payments`.
 
 ## Database commands
 

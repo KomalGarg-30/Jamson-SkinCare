@@ -35,7 +35,11 @@ export function errorResponse(error: unknown) {
     return NextResponse.json({ error: "The request body must be valid JSON." }, { status: 400 });
   }
   if (message.startsWith("Not enough stock remains") || message.startsWith("That coupon has reached its usage limit") ||
-      message.startsWith("Only pending or confirmed orders can be cancelled")) {
+      message.startsWith("Only pending or confirmed orders can be cancelled") ||
+      message.startsWith("Select one of your saved delivery addresses") ||
+      message.startsWith("Your cart is empty") ||
+      message.startsWith("That coupon is invalid") ||
+      message.startsWith("Cash on delivery is not available")) {
     return NextResponse.json({ error: message }, { status: 409 });
   }
   if (databaseError?.code === "23505") {

@@ -18,8 +18,9 @@ type RazorpayOptions = {
   key: string; amount: number; currency: string; name: string; description: string; order_id: string;
   handler: (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => void;
   modal: { ondismiss: () => void };
+  prefill?: { name?: string; email?: string; contact?: string };
 };
-declare global { interface Window { Razorpay?: new (options: RazorpayOptions) => { open: () => void } } }
+declare global { interface Window { Razorpay?: new (options: RazorpayOptions) => { open: () => void; on: (event: string, handler: (response: { error?: { description?: string } }) => void) => void } } }
 const checkoutAddressSchema = addressSchema.extend({});
 type AddressInput = z.input<typeof checkoutAddressSchema>;
 type AddressValues = z.output<typeof checkoutAddressSchema>;
@@ -36,6 +37,7 @@ export function CheckoutFlow() {
   const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay");
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
   const toast = useToast();
@@ -79,22 +81,23 @@ export function CheckoutFlow() {
   }
   async function placeOrder() {
     setBusy(true); setError("");
-    const response = await fetch("/api/checkout", {
+    const response = await fetch("/api/checkout/create-order", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ addressId: selectedAddress, paymentMethod, couponCode: couponCode.trim() || undefined }),
     });
-    const result: { error?: string; orderId?: string; total?: number; razorpay?: { orderId: string; keyId: string; currency: string } | null } = await response.json();
+    const result: { error?: string; orderId?: string; amount?: number; currency?: string; razorpayOrderId?: string | null; publicKeyId?: string | null } = await response.json();
     if (!response.ok || !result.orderId) { setBusy(false); setError(result.error || "We couldn't create your order."); return; }
     if (paymentMethod === "cod") { router.push(`/checkout/success/${result.orderId}`); return; }
-    if (!window.Razorpay || !result.razorpay) {
+    if (!window.Razorpay || !result.razorpayOrderId || !result.publicKeyId || !result.amount || !result.currency) {
       setBusy(false);
-      setError("Your order is reserved, but the secure payment window could not load. Please cancel this pending order from My Orders and try again.");
+      setError("The secure payment window is still loading. Please try again in a moment.");
       return;
     }
     const razorpay = new window.Razorpay({
-      key: result.razorpay.keyId, amount: result.total || 0, currency: result.razorpay.currency,
-      name: "Decotrin", description: "Your thoughtful everyday care", order_id: result.razorpay.orderId,
+      key: result.publicKeyId, amount: result.amount, currency: result.currency,
+      name: "Decotrin", description: "Your thoughtful everyday care", order_id: result.razorpayOrderId,
       handler: async (payment) => {
+        setError("Confirming your payment…");
         const verification = await fetch("/api/payments/verify", {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({ orderId: result.orderId, ...payment }),
@@ -103,14 +106,19 @@ export function CheckoutFlow() {
         if (!verification.ok) { setBusy(false); setError(verificationResult.error || "Payment verification failed. Contact support with your payment reference."); return; }
         router.push(`/checkout/success/${result.orderId}`);
       },
-      modal: { ondismiss: () => { setBusy(false); setError("Payment was not completed. Your order is pending; you can cancel it from My Orders."); } },
+      prefill: { name: addresses.find((address) => address.id === selectedAddress)?.name, contact: addresses.find((address) => address.id === selectedAddress)?.phone },
+      modal: { ondismiss: () => { setBusy(false); setError("Payment was not completed. Your order remains pending. You can retry it from My Orders."); } },
+    });
+    razorpay.on("payment.failed", (failure) => {
+      setBusy(false);
+      setError(`Payment failed: ${failure.error?.description || "no money was deducted, or it will be refunded in 5-7 working days if it was."}`);
     });
     razorpay.open();
   }
   if (!loaded) return <div className="container-page py-20"><div className="h-10 w-48 animate-pulse rounded bg-sand" /></div>;
   if (!items.length && !error) return <div className="container-page py-20"><h1 className="font-serif text-3xl">Your bag is empty</h1><a href="/shop" className="mt-4 inline-block text-sage-dark underline">Find something lovely</a></div>;
   return <div className="container-page py-12 md:py-16">
-    <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
+    {step === 3 && paymentMethod === "razorpay" && <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" onLoad={() => setScriptLoaded(true)} onError={() => setError("The secure payment window could not load. Please check your connection and try again.")} />}
     <p className="text-xs font-semibold uppercase tracking-[.2em] text-sage-dark">Almost yours</p><h1 className="mt-3 font-serif text-4xl">Checkout</h1>
     <div className="mt-8 flex gap-2 text-sm"><span className={step >= 1 ? "font-semibold text-sage-dark" : "text-ink/40"}>01 Delivery</span><span className="text-ink/30">—</span><span className={step >= 2 ? "font-semibold text-sage-dark" : "text-ink/40"}>02 Review</span><span className="text-ink/30">—</span><span className={step >= 3 ? "font-semibold text-sage-dark" : "text-ink/40"}>03 Payment</span></div>
     <div className="mt-8 grid items-start gap-8 lg:grid-cols-[1fr_360px]"><div className="rounded-2xl bg-white p-6 sm:p-8">
@@ -129,7 +137,7 @@ export function CheckoutFlow() {
       {step === 3 && <><h2 className="font-serif text-2xl">Payment method</h2><div className="mt-5 grid gap-3">
         <label className={`flex cursor-pointer gap-3 rounded-xl border p-4 ${paymentMethod === "razorpay" ? "border-sage bg-sage/5" : "border-ink/10"}`}><input type="radio" checked={paymentMethod === "razorpay"} onChange={() => setPaymentMethod("razorpay")} /><span><strong>Pay online</strong><small className="mt-1 block text-ink/60">Secure payment by card, UPI or net banking.</small></span></label>
         <label className={`flex cursor-pointer gap-3 rounded-xl border p-4 ${paymentMethod === "cod" ? "border-sage bg-sage/5" : "border-ink/10"}`}><input type="radio" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} /><span><strong>Cash on delivery</strong><small className="mt-1 block text-ink/60">Pay when your order arrives.</small></span></label>
-      </div><div className="mt-5 flex gap-3"><Button variant="secondary" onClick={() => setStep(2)}>Back</Button><Button disabled={busy || !selectedAddress} onClick={placeOrder}>{busy ? "Preparing your order…" : `Place order · ${formatPrice(subtotal)}`}</Button></div></>}
+      </div>{paymentMethod === "razorpay" && !scriptLoaded && <p className="mt-4 text-sm text-ink/60">Loading secure payment…</p>}<p className="mt-4 text-xs text-ink/55">Do not refresh or close this page while payment is being confirmed.</p><div className="mt-5 flex gap-3"><Button variant="secondary" onClick={() => setStep(2)}>Back</Button><Button disabled={busy || !selectedAddress || (paymentMethod === "razorpay" && !scriptLoaded)} onClick={placeOrder}>{busy ? "Preparing your order…" : `Place order · ${formatPrice(quote.total || subtotal)}`}</Button></div></>}
       {error && <p role="alert" className="mt-5 rounded-xl bg-rose-50 p-4 text-sm leading-6 text-rose-800">{error}</p>}
     </div><aside className="rounded-2xl bg-white p-6"><h2 className="font-serif text-2xl">Order summary</h2><div className="mt-5 space-y-3 text-sm"><p className="flex justify-between"><span>Subtotal</span><span>{formatPrice(quote.subtotal || subtotal)}</span></p><p className="flex justify-between"><span>Shipping</span><span>{quote.shipping ? formatPrice(quote.shipping) : "Free"}</span></p><p className="flex justify-between"><span>Tax</span><span>{formatPrice(quote.tax)}</span></p>{quote.discount > 0 && <p className="flex justify-between text-sage-dark"><span>Coupon discount</span><span>-{formatPrice(quote.discount)}</span></p>}<p className="flex justify-between border-t pt-3 font-semibold"><span>Total</span><span>{formatPrice(quote.total)}</span></p></div><label className="mt-5 block text-sm">Coupon code<input className="field mt-2" value={couponCode} onChange={(event) => { setCouponCode(event.target.value); setQuote(baseQuote); setError(""); }} placeholder="Enter code" /></label><Button variant="secondary" className="mt-3 w-full" onClick={applyCoupon}>Apply coupon</Button><p className="mt-4 text-xs leading-5 text-ink/55">Your final order amount is recalculated securely on the server.</p></aside></div>
   </div>;

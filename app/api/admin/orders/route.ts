@@ -45,7 +45,9 @@ export async function PATCH(request: Request) {
         const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, id));
         for (const item of items) {
           if (item.productId) await tx.update(products)
-            .set({ stock: sql`${products.stock} + ${item.quantity}`, updatedAt: new Date() })
+            .set(previous.paymentStatus === "paid"
+              ? { stock: sql`${products.stock} + ${item.quantity}`, updatedAt: new Date() }
+              : { reservedStock: sql`GREATEST(${products.reservedStock} - ${item.quantity}, 0)`, updatedAt: new Date() })
             .where(eq(products.id, item.productId));
         }
         if (updates.paymentStatus) {

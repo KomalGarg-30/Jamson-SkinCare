@@ -6,7 +6,7 @@ const links = [
   ["Overview", "/admin", BarChart3], ["Products", "/admin/products", Boxes],
   ["Categories", "/admin/categories", FolderTree], ["Orders", "/admin/orders", ClipboardList],
   ["Customers", "/admin/customers", Users], ["Users", "/admin/users", Users],
-  ["Returns", "/admin/returns", RotateCcw], ["Reviews", "/admin/reviews", MessageSquare],
+  ["Returns", "/admin/returns", RotateCcw], ["Payments", "/admin/payments", ClipboardList], ["Reviews", "/admin/reviews", MessageSquare],
   ["Coupons", "/admin/coupons", TicketPercent], ["Banners", "/admin/banners", Image],
   ["Settings", "/admin/settings", Settings],
 ] as const;

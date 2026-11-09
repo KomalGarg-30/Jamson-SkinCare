@@ -21,8 +21,8 @@ const timestamps = {
 
 export const userRole = pgEnum("user_role", ["user", "admin"]);
 export const emailOtpPurpose = pgEnum("email_otp_purpose", ["signup", "password_reset"]);
-export const orderStatus = pgEnum("order_status", ["pending", "confirmed", "shipped", "delivered", "cancelled"]);
-export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "failed", "refunded"]);
+export const orderStatus = pgEnum("order_status", ["pending", "pending_payment", "confirmed", "shipped", "delivered", "cancelled", "payment_review"]);
+export const paymentStatus = pgEnum("payment_status", ["created", "pending", "authorized", "captured", "paid", "collected", "failed", "expired", "refunded"]);
 export const returnStatus = pgEnum("return_status", ["requested", "approved", "rejected", "picked_up", "received", "refunded"]);
 
 export const users = pgTable("users", {
@@ -82,6 +82,7 @@ export const products = pgTable("products", {
   discountPrice: integer("discount_price"),
   sku: varchar("sku", { length: 80 }).notNull().unique(),
   stock: integer("stock").default(0).notNull(),
+  reservedStock: integer("reserved_stock").default(0).notNull(),
   rating: integer("rating").default(0).notNull(),
   reviewCount: integer("review_count").default(0).notNull(),
   featured: boolean("featured").default(false).notNull(),
@@ -94,6 +95,7 @@ export const products = pgTable("products", {
   check("products_price_positive", sql`${table.price} > 0`),
   check("products_discount_price_valid", sql`${table.discountPrice} IS NULL OR (${table.discountPrice} > 0 AND ${table.discountPrice} < ${table.price})`),
   check("products_stock_nonnegative", sql`${table.stock} >= 0`),
+  check("products_reserved_stock_nonnegative", sql`${table.reservedStock} >= 0`),
   check("products_rating_range", sql`${table.rating} BETWEEN 0 AND 500`),
 ]);
 
@@ -139,6 +141,8 @@ export const orders = pgTable("orders", {
   paymentStatus: paymentStatus("payment_status").default("pending").notNull(),
   deliveredAt: timestamp("delivered_at", { withTimezone: true }),
   paymentMethod: varchar("payment_method", { length: 30 }).notNull(),
+  reservedUntil: timestamp("reserved_until", { withTimezone: true }),
+  idempotencyKey: varchar("idempotency_key", { length: 160 }),
   subtotal: integer("subtotal").notNull(),
   shipping: integer("shipping").notNull(),
   tax: integer("tax").notNull(),
@@ -151,6 +155,7 @@ export const orders = pgTable("orders", {
   index("orders_user_idx").on(table.userId),
   index("orders_status_idx").on(table.status),
   index("orders_created_idx").on(table.createdAt),
+  uniqueIndex("orders_user_idempotency_idx").on(table.userId, table.idempotencyKey).where(sql`${table.idempotencyKey} IS NOT NULL`),
   check("orders_amounts_nonnegative", sql`${table.subtotal} >= 0 AND ${table.shipping} >= 0 AND ${table.tax} >= 0 AND ${table.discount} >= 0 AND ${table.total} >= 0`),
 ]);
 
@@ -162,6 +167,7 @@ export const orderItems = pgTable("order_items", {
   sku: varchar("sku", { length: 80 }).notNull(),
   quantity: integer("quantity").notNull(),
   unitPrice: integer("unit_price").notNull(),
+  imageUrl: text("image_url"),
   ...timestamps,
 }, (table) => [
   index("order_items_order_idx").on(table.orderId),
@@ -172,15 +178,21 @@ export const orderItems = pgTable("order_items", {
 export const payments = pgTable("payments", {
   id: uuid("id").defaultRandom().primaryKey(),
   orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   provider: varchar("provider", { length: 30 }).notNull(),
   providerOrderId: varchar("provider_order_id", { length: 120 }),
   providerPaymentId: varchar("provider_payment_id", { length: 120 }),
+  providerPaymentMethod: varchar("provider_payment_method", { length: 40 }),
   signature: text("signature"),
   amount: integer("amount").notNull(),
   status: paymentStatus("status").default("pending").notNull(),
+  failureReason: text("failure_reason"),
+  refundedAmount: integer("refunded_amount").default(0).notNull(),
   ...timestamps,
 }, (table) => [
   index("payments_order_idx").on(table.orderId),
+  index("payments_user_idx").on(table.userId),
+  index("payments_provider_payment_idx").on(table.providerPaymentId),
   uniqueIndex("payments_provider_order_idx").on(table.providerOrderId).where(sql`${table.providerOrderId} IS NOT NULL`),
 ]);
 
@@ -315,8 +327,57 @@ export const rateLimitBuckets = pgTable("rate_limit_buckets", {
 export const webhookEvents = pgTable("webhook_events", {
   eventId: varchar("event_id", { length: 160 }).primaryKey(),
   eventType: varchar("event_type", { length: 120 }).notNull(),
+  payload: jsonb("payload"),
+  status: varchar("status", { length: 30 }).default("received").notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [index("webhook_events_created_at_idx").on(table.createdAt)]);
+
+export const refunds = pgTable("refunds", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  paymentId: uuid("payment_id").notNull().references(() => payments.id, { onDelete: "restrict" }),
+  returnId: uuid("return_id").references(() => returns.id, { onDelete: "set null" }),
+  razorpayRefundId: varchar("razorpay_refund_id", { length: 120 }),
+  amount: integer("amount").notNull(),
+  status: varchar("status", { length: 30 }).default("pending").notNull(),
+  reason: text("reason").notNull(),
+  speed: varchar("speed", { length: 20 }),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("refunds_razorpay_id_idx").on(table.razorpayRefundId).where(sql`${table.razorpayRefundId} IS NOT NULL`),
+  uniqueIndex("refunds_return_unique_idx").on(table.returnId).where(sql`${table.returnId} IS NOT NULL`),
+  index("refunds_payment_idx").on(table.paymentId),
+]);
+
+export const paymentDiscrepancies = pgTable("payment_discrepancies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+  paymentId: uuid("payment_id").references(() => payments.id, { onDelete: "set null" }),
+  kind: varchar("kind", { length: 60 }).notNull(),
+  details: jsonb("details").notNull(),
+  status: varchar("status", { length: 30 }).default("open").notNull(),
+  resolvedBy: uuid("resolved_by").references(() => users.id, { onDelete: "set null" }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  ...timestamps,
+}, (table) => [
+  index("payment_discrepancies_status_idx").on(table.status),
+  index("payment_discrepancies_order_idx").on(table.orderId),
+]);
+
+export const paymentAuditLogs = pgTable("payment_audit_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  paymentId: uuid("payment_id").references(() => payments.id, { onDelete: "set null" }),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+  actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+  action: varchar("action", { length: 80 }).notNull(),
+  amount: integer("amount"),
+  reason: text("reason"),
+  metadata: jsonb("metadata"),
+  ...timestamps,
+}, (table) => [
+  index("payment_audit_logs_payment_idx").on(table.paymentId, table.createdAt),
+]);
 
 export const newsletterSubscribers = pgTable("newsletter_subscribers", {
   id: uuid("id").defaultRandom().primaryKey(),

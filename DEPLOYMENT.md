@@ -109,7 +109,12 @@ Add these in **Project Settings → Environment Variables**. Use test Razorpay c
 | `RAZORPAY_KEY_ID` | Razorpay dashboard → API Keys; TEST in Preview, LIVE in Production | Online payments/refunds |
 | `RAZORPAY_KEY_SECRET` | Razorpay dashboard → API Keys; server-only | Online payments/refunds |
 | `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Same environment's Razorpay Key ID | Online payments |
-| `RAZORPAY_WEBHOOK_SECRET` | The secret configured for the Razorpay webhook | Online payment webhooks |
+| `RAZORPAY_WEBHOOK_SECRET` | A random secret configured in the Razorpay webhook settings; different from the API key secret | Online payment webhooks |
+| `RAZORPAY_MODE` | `test` for Development/Preview, `live` for Production only | Online payments |
+| `PAYMENT_PENDING_EXPIRY_MINUTES` | Reservation lifetime; defaults to `15` | Online payments |
+| `COD_ENABLED` | `true` or `false` | COD |
+| `COD_MAX_ORDER_AMOUNT` | Maximum COD total in paise | COD |
+| `COD_EXTRA_CHARGE` | COD surcharge in paise | COD |
 | `RESEND_API_KEY` | Resend dashboard → API Keys; server-only | Required for auth email |
 | `EMAIL_FROM` | Sender on a verified Resend domain, e.g. `Decotrin <noreply@decotrin.com>` | Required for auth email |
 | `EMAIL_REPLY_TO` | Customer-support email address | Optional |

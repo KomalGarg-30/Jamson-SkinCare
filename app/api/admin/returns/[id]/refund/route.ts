@@ -1,7 +1,7 @@
 import Razorpay from "razorpay";
 import { and, eq, isNull } from "drizzle-orm";
 import { after, NextResponse } from "next/server";
-import { auditLogs, orders, payments, returns, users } from "@/db/schema";
+import { auditLogs, orders, payments, refunds, returns, users } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { errorResponse } from "@/lib/api";
 import { requireEnv } from "@/lib/env";
@@ -58,12 +58,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       if (order.paymentMethod !== "razorpay" || order.paymentStatus !== "paid") {
         return { error: "The original online payment is not eligible for an automated refund.", status: 409 as const };
       }
-      const [payment] = await tx.select({ providerPaymentId: payments.providerPaymentId })
+      const [payment] = await tx.select({ id: payments.id, providerPaymentId: payments.providerPaymentId })
         .from(payments).where(eq(payments.orderId, record.orderId)).limit(1);
       if (!payment?.providerPaymentId) return { error: "The original Razorpay payment ID is unavailable.", status: 409 as const };
       const now = new Date();
       await tx.update(returns).set({ refundRequestedAt: now, updatedAt: now }).where(eq(returns.id, record.id));
-      return { record, paymentId: payment.providerPaymentId, manual: false as const };
+      return { record, paymentId: payment.providerPaymentId, paymentDbId: payment.id, manual: false as const };
     });
 
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
@@ -98,6 +98,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         oldValue: { status: "received" },
         newValue: { status: "refunded", amount: record.refundAmount, providerRefundId: refundId },
       });
+      if (record) await tx.insert(refunds).values({
+        paymentId: result.paymentDbId, returnId: record.id, razorpayRefundId: refundId,
+        amount: record.refundAmount, status: "pending", reason: record.reason, createdBy: admin.id,
+      }).onConflictDoNothing();
       return record;
     });
     if (!updated) return NextResponse.json({ error: `The refund was issued but the return record could not be finalized. Contact support with refund ${refundId}.` }, { status: 409 });

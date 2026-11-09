@@ -8,7 +8,7 @@ const schema = z.object({
   NEXT_PUBLIC_APP_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
   VERCEL_URL: z.string().optional(),
   STORE_NAME: z.string().default("Decotrin").transform((value) => value.trim() || "Decotrin"),
-  CURRENCY: z.string().default("INR").transform((value) => value.trim().toUpperCase() || "INR"),
+  CURRENCY: z.string().default("INR").transform((value) => value.trim().toUpperCase() || "INR").refine((value) => value === "INR", "Only INR is supported by Razorpay checkout."),
   IMAGEKIT_PUBLIC_KEY: z.string().optional(),
   IMAGEKIT_PRIVATE_KEY: z.string().optional(),
   IMAGEKIT_URL_ENDPOINT: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
@@ -21,6 +21,11 @@ const schema = z.object({
   RAZORPAY_KEY_SECRET: z.string().optional(),
   NEXT_PUBLIC_RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  RAZORPAY_MODE: z.enum(["test", "live"]).default("test"),
+  PAYMENT_PENDING_EXPIRY_MINUTES: z.preprocess((value) => value === "" || value === undefined ? 15 : value, z.coerce.number().int().min(1).max(1440)),
+  COD_ENABLED: z.preprocess((value) => value === "" || value === undefined ? false : value === true || value === "true", z.boolean()),
+  COD_MAX_ORDER_AMOUNT: z.preprocess((value) => value === "" || value === undefined ? 0 : value, z.coerce.number().int().nonnegative()),
+  COD_EXTRA_CHARGE: z.preprocess((value) => value === "" || value === undefined ? 0 : value, z.coerce.number().int().nonnegative()),
   RESEND_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().optional()),
   EMAIL_FROM: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().min(1, "EMAIL_FROM is required to send email.").optional()),
   EMAIL_REPLY_TO: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().email("EMAIL_REPLY_TO must be a valid support email.").optional()),
@@ -37,6 +42,17 @@ const schema = z.object({
 
 function deploymentIssues(data: z.infer<typeof schema>) {
   const missing: string[] = [];
+  const paymentConfigured = Boolean(data.RAZORPAY_KEY_ID || data.RAZORPAY_KEY_SECRET || data.NEXT_PUBLIC_RAZORPAY_KEY_ID || data.RAZORPAY_WEBHOOK_SECRET);
+  if (paymentConfigured) {
+    if (!data.RAZORPAY_KEY_ID) missing.push("RAZORPAY_KEY_ID");
+    if (!data.RAZORPAY_KEY_SECRET) missing.push("RAZORPAY_KEY_SECRET");
+    if (!data.NEXT_PUBLIC_RAZORPAY_KEY_ID) missing.push("NEXT_PUBLIC_RAZORPAY_KEY_ID");
+    if (!data.RAZORPAY_WEBHOOK_SECRET) missing.push("RAZORPAY_WEBHOOK_SECRET");
+    const expectedPrefix = data.RAZORPAY_MODE === "live" ? "rzp_live_" : "rzp_test_";
+    if (data.RAZORPAY_KEY_ID && !data.RAZORPAY_KEY_ID.startsWith(expectedPrefix)) missing.push(`RAZORPAY_KEY_ID (must start with ${expectedPrefix})`);
+    if (data.NEXT_PUBLIC_RAZORPAY_KEY_ID && !data.NEXT_PUBLIC_RAZORPAY_KEY_ID.startsWith(expectedPrefix)) missing.push(`NEXT_PUBLIC_RAZORPAY_KEY_ID (must start with ${expectedPrefix})`);
+    if (data.RAZORPAY_MODE === "live" && process.env.NODE_ENV !== "production") missing.push("RAZORPAY_MODE=live is allowed only in production");
+  }
   if (!data.NEXT_PUBLIC_APP_URL && !data.VERCEL_URL) missing.push("NEXT_PUBLIC_APP_URL (or VERCEL_URL)");
   if (process.env.VERCEL === "1" || process.env.DEPLOYMENT_ENV_CHECK === "1") {
     const pooledHost = new URL(data.DATABASE_URL).hostname;
