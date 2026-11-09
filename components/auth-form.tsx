@@ -81,7 +81,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     }
   }
 
-  return <form onSubmit={form.handleSubmit(submit)} className="grid gap-4">
+  const googleHref = `/api/auth/google${search.get("next") ? `?next=${encodeURIComponent(search.get("next") || "")}` : ""}`;
+  return <div className="grid gap-4"><a href={googleHref} className="flex h-12 items-center justify-center gap-3 rounded-full border border-ink/15 bg-white text-sm font-medium hover:bg-sand"><span className="text-base font-semibold">G</span> Continue with Google</a><div className="flex items-center gap-3 text-xs text-ink/40"><span className="h-px flex-1 bg-ink/10" /><span>or</span><span className="h-px flex-1 bg-ink/10" /></div><form onSubmit={form.handleSubmit(submit)} className="grid gap-4">
     {mode === "signup" && <>
       <label className="grid gap-2 text-sm">Full name<input className="field" autoComplete="name" {...form.register("name")} /></label>
       <label className="grid gap-2 text-sm">Phone number<input className="field" type="tel" autoComplete="tel" {...form.register("phone")} /></label>
@@ -92,7 +93,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     {form.formState.errors.root && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{form.formState.errors.root.message}</p>}
     <Button size="lg" type="submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}</Button>
     <p className="text-center text-sm text-ink/60">{mode === "signup" ? "Already have an account?" : "New to Decotrin?"} <Link className="font-medium text-sage-dark underline" href={mode === "signup" ? "/login" : "/signup"}>{mode === "signup" ? "Sign in" : "Create an account"}</Link></p>
-  </form>;
+  </form></div>;
 }
 
 function passwordStrength(password: string) {

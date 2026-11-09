@@ -68,6 +68,8 @@ Decotrin/
    RESEND_API_KEY=
    EMAIL_FROM=Decotrin <noreply@decotrin.com>
    EMAIL_REPLY_TO=support@yourdomain.com
+   GOOGLE_CLIENT_ID=
+   GOOGLE_CLIENT_SECRET=
    OTP_LENGTH=6
    OTP_EXPIRY_MINUTES=1
    OTP_RESEND_COOLDOWN_SECONDS=60

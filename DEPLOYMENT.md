@@ -77,7 +77,16 @@ Email is required for verified signup and password recovery:
 4. Choose `EMAIL_FROM` on that domain, for example `Decotrin <noreply@decotrin.com>`. For testing only, `onboarding@resend.dev` is limited to sending to the email address of your own Resend account. Set `EMAIL_REPLY_TO` to your support inbox.
 5. Add the values in Vercel as described in the next section. `RESEND_API_KEY` is a server-only secret; never use a `NEXT_PUBLIC_` prefix.
 
-## 6. Configure environment variables
+## 6. Set up Google sign-in
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project and configure the OAuth consent screen.
+2. Create an OAuth client under **APIs & Services → Credentials → Create credentials → OAuth client ID**, choosing **Web application**.
+3. Add `http://localhost:3000/api/auth/google/callback` and `https://decotrin.com/api/auth/google/callback` as authorized redirect URIs.
+4. Add the generated credentials to Vercel as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Keep both server-only.
+
+The Google button appears on sign-in and signup. Google-verified accounts are linked by email and use the normal Decotrin session.
+
+## 7. Configure environment variables
 
 Add these in **Project Settings → Environment Variables**. Use test Razorpay credentials for Preview and Development; use live Razorpay keys only in Production. Vercel sets `NODE_ENV` and `VERCEL_URL` automatically. Environment variables used by the build must be present before the first deployment.
 
@@ -104,6 +113,8 @@ Add these in **Project Settings → Environment Variables**. Use test Razorpay c
 | `RESEND_API_KEY` | Resend dashboard → API Keys; server-only | Required for auth email |
 | `EMAIL_FROM` | Sender on a verified Resend domain, e.g. `Decotrin <noreply@decotrin.com>` | Required for auth email |
 | `EMAIL_REPLY_TO` | Customer-support email address | Optional |
+| `GOOGLE_CLIENT_ID` | Google Cloud OAuth web application client ID | Optional Google sign-in |
+| `GOOGLE_CLIENT_SECRET` | Google Cloud OAuth web application client secret; server-only | Optional Google sign-in |
 | `OTP_LENGTH` | OTP digits; defaults to `6` | No |
 | `OTP_EXPIRY_MINUTES` | OTP validity; defaults to `1` minute | No |
 | `OTP_RESEND_COOLDOWN_SECONDS` | Server-enforced resend cooldown; defaults to `60` | No |
@@ -117,7 +128,7 @@ Add these in **Project Settings → Environment Variables**. Use test Razorpay c
 
 `DATABASE_URL` and `JWT_SECRET` are required for the store; email actions also require `RESEND_API_KEY` and `EMAIL_FROM`. Vercel provides `VERCEL_URL` for absolute links, though `NEXT_PUBLIC_APP_URL` should be set for a custom domain. The scheduled cleanup endpoint remains disabled until `CRON_SECRET` is set. `DATABASE_URL_UNPOOLED` is needed only for database migrations. Set variables for Production, Preview, and Development as appropriate, and never prefix private credentials with `NEXT_PUBLIC_`. Supplied values are validated without printing secret values.
 
-## 7. Configure Razorpay webhooks (optional)
+## 8. Configure Razorpay webhooks (optional)
 
 Skip this step until enabling Razorpay payments. After deploying and adding Razorpay credentials in Vercel, configure the webhook in the Razorpay dashboard:
 
@@ -127,11 +138,11 @@ Skip this step until enabling Razorpay payments. After deploying and adding Razo
 
 The webhook validates the raw request body signature and uses Razorpay's event ID to ignore duplicates. ImageKit uses the configured endpoint and API keys; if ImageKit restrictions are enabled, allow your production domain.
 
-## 8. Custom domain
+## 9. Custom domain
 
 Add the domain under **Vercel → Project → Settings → Domains**, then create the DNS records Vercel shows at your domain registrar. Once verified, set `NEXT_PUBLIC_APP_URL=https://<your-domain>` for the correct Vercel environments and redeploy.
 
-## 9. Promote the first administrator
+## 10. Promote the first administrator
 
 Create the account through the normal signup flow. In the production Neon SQL Editor, replace the example address with that account's email and run:
 
@@ -148,7 +159,7 @@ FROM promoted;
 
 Then sign in again to issue a fresh session. Other accounts can be promoted in **Admin → Users**.
 
-## 10. Post-deploy checklist
+## 11. Post-deploy checklist
 
 - `https://<your-domain>/api/health` returns `status: "ok"` and `database: "connected"`.
 - Signup OTP, login, resend cooldown, and password-reset OTP work.

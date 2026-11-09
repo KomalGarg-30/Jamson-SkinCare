@@ -24,6 +24,8 @@ const schema = z.object({
   RESEND_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().optional()),
   EMAIL_FROM: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().min(1, "EMAIL_FROM is required to send email.").optional()),
   EMAIL_REPLY_TO: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().email("EMAIL_REPLY_TO must be a valid support email.").optional()),
+  GOOGLE_CLIENT_ID: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().optional()),
+  GOOGLE_CLIENT_SECRET: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().optional()),
   OTP_LENGTH: z.preprocess((value) => value === "" || value === undefined ? 6 : value, z.coerce.number().int().min(4).max(8)),
   OTP_EXPIRY_MINUTES: z.preprocess((value) => value === "" || value === undefined ? 1 : value, z.coerce.number().int().min(1).max(60)),
   OTP_RESEND_COOLDOWN_SECONDS: z.preprocess((value) => value === "" || value === undefined ? 60 : value, z.coerce.number().int().min(1).max(3600)),
