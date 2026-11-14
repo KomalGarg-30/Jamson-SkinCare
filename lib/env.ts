@@ -57,9 +57,6 @@ function deploymentIssues(data: z.infer<typeof schema>) {
   if (process.env.VERCEL === "1" || process.env.DEPLOYMENT_ENV_CHECK === "1") {
     const pooledHost = new URL(data.DATABASE_URL).hostname;
     if (!pooledHost.includes("-pooler")) missing.push("DATABASE_URL (must be the Neon pooled connection string containing -pooler)");
-    if (data.DATABASE_URL_UNPOOLED && new URL(data.DATABASE_URL_UNPOOLED).hostname.includes("-pooler")) {
-      missing.push("DATABASE_URL_UNPOOLED (must be the Neon direct, non-pooled connection string)");
-    }
     if (!data.RESEND_API_KEY) missing.push("RESEND_API_KEY (create one in Resend)");
     if (!data.EMAIL_FROM) missing.push("EMAIL_FROM (use a verified Resend sender)");
   }

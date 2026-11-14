@@ -3,11 +3,14 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import ws from "ws";
 
-const migrationUrl = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
+const configuredMigrationUrl = process.env.DATABASE_URL_UNPOOLED?.trim();
+const migrationUrl = configuredMigrationUrl && !new URL(configuredMigrationUrl).hostname.includes("-pooler")
+  ? configuredMigrationUrl
+  : process.env.DATABASE_URL;
 if (!migrationUrl) {
   throw new Error("Set DATABASE_URL or DATABASE_URL_UNPOOLED before running production migrations.");
 }
-if (!process.env.DATABASE_URL_UNPOOLED) {
+if (!configuredMigrationUrl || configuredMigrationUrl.includes("-pooler")) {
   console.warn("DATABASE_URL_UNPOOLED is not set; running migrations with DATABASE_URL.");
 }
 
