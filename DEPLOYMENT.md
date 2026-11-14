@@ -41,7 +41,7 @@ npm run db:migrate:prod
 npm run db:seed:prod
 ```
 
-The migration command refuses to run without `DATABASE_URL_UNPOOLED`. Add both connection strings to Vercel as Production environment variables. The Vercel build runs `npm run db:migrate:prod` automatically before `next build`; code-only deployments simply find no pending migrations. Review SQL migrations before pushing them. The production seed creates only the default categories and store settings; it does not add demo products. Never run the demo `db:seed` against production.
+The migration command prefers `DATABASE_URL_UNPOOLED` and falls back to `DATABASE_URL` when the direct URL is not configured. Add `DATABASE_URL_UNPOOLED` to Vercel when available because direct connections are preferred for migrations. The Vercel build runs `npm run db:migrate:prod` automatically before `next build`; code-only deployments simply find no pending migrations. Review SQL migrations before pushing them. The production seed creates only the default categories and store settings; it does not add demo products. Never run the demo `db:seed` against production.
 
 Before migrating an existing Neon database, check its migration ledger:
 

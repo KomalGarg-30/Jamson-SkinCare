@@ -3,13 +3,17 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import ws from "ws";
 
+const migrationUrl = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
+if (!migrationUrl) {
+  throw new Error("Set DATABASE_URL or DATABASE_URL_UNPOOLED before running production migrations.");
+}
 if (!process.env.DATABASE_URL_UNPOOLED) {
-  throw new Error("Set DATABASE_URL_UNPOOLED to the direct Neon connection string before running production migrations.");
+  console.warn("DATABASE_URL_UNPOOLED is not set; running migrations with DATABASE_URL.");
 }
 
 async function migrateProduction() {
   neonConfig.webSocketConstructor = ws;
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL_UNPOOLED, max: 1 });
+  const pool = new Pool({ connectionString: migrationUrl, max: 1 });
   try {
     const { rows } = await pool.query(
       "SELECT to_regclass('public.users') AS users_table, to_regclass('public.products') AS products_table, to_regclass('drizzle.__drizzle_migrations') AS drizzle_migrations, to_regclass('public.__drizzle_migrations') AS public_migrations",
