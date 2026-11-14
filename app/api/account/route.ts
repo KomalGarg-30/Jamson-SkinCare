@@ -14,7 +14,10 @@ export async function GET() {
     const [userProfile, userOrders, savedAddresses, cart, wishlist, userReviews, userReturns, paymentHistory, activity] = await Promise.all([
       db.select({ id: users.id, name: users.name, email: users.email, phone: users.phone, role: users.role, createdAt: users.createdAt, lastLoginAt: users.lastLoginAt })
         .from(users).where(eq(users.id, user.id)).limit(1),
-      db.select().from(orders).where(eq(orders.userId, user.id)).orderBy(desc(orders.createdAt)),
+      db.select({
+        id: orders.id, status: orders.status, paymentStatus: orders.paymentStatus,
+        paymentMethod: orders.paymentMethod, total: orders.total, createdAt: orders.createdAt,
+      }).from(orders).where(eq(orders.userId, user.id)).orderBy(desc(orders.createdAt)),
       db.select().from(addresses).where(eq(addresses.userId, user.id)).orderBy(desc(addresses.isDefault)),
       db.select({
         productId: products.id, name: products.name, slug: products.slug, quantity: cartItems.quantity,
@@ -31,7 +34,12 @@ export async function GET() {
         productName: products.name,
       }).from(reviews).innerJoin(products, eq(reviews.productId, products.id))
         .where(eq(reviews.userId, user.id)).orderBy(desc(reviews.createdAt)),
-      db.select().from(returns).where(eq(returns.userId, user.id)).orderBy(desc(returns.createdAt)),
+      db.select({
+        id: returns.id, orderId: returns.orderId, reason: returns.reason, comment: returns.comment,
+        photos: returns.photos, status: returns.status, refundAmount: returns.refundAmount,
+        providerRefundId: returns.providerRefundId, refundedAt: returns.refundedAt,
+        adminNotes: returns.adminNotes, createdAt: returns.createdAt,
+      }).from(returns).where(eq(returns.userId, user.id)).orderBy(desc(returns.createdAt)),
       db.select({
         id: payments.id, orderId: payments.orderId, provider: payments.provider,
         providerPaymentId: payments.providerPaymentId, amount: payments.amount, status: payments.status,
