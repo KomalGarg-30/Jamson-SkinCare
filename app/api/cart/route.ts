@@ -31,7 +31,9 @@ export async function POST(request: Request) {
   try {
     const user = await requireUser();
     const data = addCartSchema.parse(await request.json());
-    const [product] = await db.select().from(products).where(and(eq(products.id, data.productId), eq(products.isActive, true))).limit(1);
+    const [product] = await db.select({
+      id: products.id, stock: products.stock,
+    }).from(products).where(and(eq(products.id, data.productId), eq(products.isActive, true))).limit(1);
     if (!product) return NextResponse.json({ error: "This product is no longer available." }, { status: 404 });
     const [existing] = await db.select().from(cartItems).where(and(eq(cartItems.userId, user.id), eq(cartItems.productId, data.productId))).limit(1);
     const quantity = (existing?.quantity ?? 0) + data.quantity;

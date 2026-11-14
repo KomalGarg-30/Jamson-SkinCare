@@ -7,7 +7,17 @@ import { errorResponse } from "@/lib/api";
 export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = await params;
-    const [product] = await db.select().from(products).innerJoin(categories, eq(products.categoryId, categories.id))
+    const [product] = await db.select({
+      products: {
+        id: products.id, categoryId: products.categoryId, name: products.name, slug: products.slug,
+        description: products.description, ingredients: products.ingredients, howToUse: products.howToUse,
+        brand: products.brand, price: products.price, discountPrice: products.discountPrice,
+        stock: products.stock, rating: products.rating, reviewCount: products.reviewCount,
+      },
+      categories: {
+        id: categories.id, name: categories.name, slug: categories.slug,
+      },
+    }).from(products).innerJoin(categories, eq(products.categoryId, categories.id))
       .where(and(eq(products.slug, slug), eq(products.isActive, true), eq(categories.isActive, true))).limit(1);
     if (!product) return NextResponse.json({ error: "Product not found." }, { status: 404 });
     const [images, productReviews] = await Promise.all([
