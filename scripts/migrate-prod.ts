@@ -1,7 +1,10 @@
 import { neonConfig, Pool } from "@neondatabase/serverless";
+import { loadEnvConfig } from "@next/env";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import ws from "ws";
+
+loadEnvConfig(process.cwd());
 
 const configuredMigrationUrl = process.env.DATABASE_URL_UNPOOLED?.trim();
 const migrationUrl = configuredMigrationUrl && !new URL(configuredMigrationUrl).hostname.includes("-pooler")
@@ -49,7 +52,7 @@ async function migrateProduction() {
   if (needsSchemaPush) {
     console.warn("No Drizzle migration history was found; synchronizing the existing database schema before the build.");
   }
-  const result = spawnSync(process.execPath, [cli, command], {
+  const result = spawnSync(process.execPath, [cli, command, ...(needsSchemaPush ? ["--force"] : [])], {
     stdio: "inherit",
     env: { ...process.env, DATABASE_URL_UNPOOLED: migrationUrl },
   });
