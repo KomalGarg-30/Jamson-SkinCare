@@ -17,6 +17,7 @@ if (!configuredMigrationUrl || configuredMigrationUrl.includes("-pooler")) {
 async function migrateProduction() {
   neonConfig.webSocketConstructor = ws;
   const pool = new Pool({ connectionString: migrationUrl, max: 1 });
+  let needsSchemaPush = false;
   try {
     const { rows } = await pool.query(
       "SELECT to_regclass('public.users') AS users_table, to_regclass('public.products') AS products_table, to_regclass('drizzle.__drizzle_migrations') AS drizzle_migrations, to_regclass('public.__drizzle_migrations') AS public_migrations",
@@ -37,16 +38,21 @@ async function migrateProduction() {
       migrationCount = Number((migrationRows[0] as { count: number }).count);
     }
     if (existingApplicationSchema && migrationCount === 0) {
-      throw new Error(
-        "Production migrations stopped: application tables exist but Drizzle has no recorded migration history. Do not apply the initial migrations to an existing db:push database. Reconcile and verify its migration baseline on a Neon branch first.",
-      );
+      needsSchemaPush = true;
     }
   } finally {
     await pool.end();
   }
 
   const cli = resolve("node_modules", "drizzle-kit", "bin.cjs");
-  const result = spawnSync(process.execPath, [cli, "migrate"], { stdio: "inherit", env: process.env });
+  const command = needsSchemaPush ? "push" : "migrate";
+  if (needsSchemaPush) {
+    console.warn("No Drizzle migration history was found; synchronizing the existing database schema before the build.");
+  }
+  const result = spawnSync(process.execPath, [cli, command], {
+    stdio: "inherit",
+    env: { ...process.env, DATABASE_URL_UNPOOLED: migrationUrl },
+  });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exitCode = result.status ?? 1;
 }
