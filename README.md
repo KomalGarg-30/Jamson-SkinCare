@@ -106,16 +106,15 @@ Before go-live, complete Razorpay KYC, apply the migration, configure the live w
 
 - `npm run db:generate` — generate a versioned SQL migration from the Drizzle schema.
 - `npm run db:migrate` — apply generated migrations to the configured database.
-- `npm run db:migrate:prod` — apply reviewed migrations using `DATABASE_URL_UNPOOLED` (direct Neon connection); never run automatically during a Vercel build.
+- `npm run db:migrate:prod` — apply reviewed migrations using `DATABASE_URL_UNPOOLED` (direct Neon connection); Vercel runs it automatically before each build.
 - `npm run db:push` — push the current schema directly to Neon (convenient for initial setup).
 - `npm run db:seed` — insert or update the sample categories/products and default store settings.
 
-For production, generate and review migrations, apply them manually before deployment with `npm run db:migrate:prod`, then build:
+For production, generate and review migrations, then push them. Vercel runs `npm run db:migrate:prod` automatically before each production build using the server-only `DATABASE_URL_UNPOOLED` variable:
 
 ```bash
 npm run db:generate
-npm run db:migrate:prod
-npm run build
+git push
 ```
 
 Vercel uses the pooled `DATABASE_URL` at runtime and runs in Mumbai (`bom1`). Choose the nearest available Neon region, such as Mumbai or Singapore, to minimize database latency. Use `npm run db:seed:prod` for categories and settings only; it does not create sample products. See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete Vercel setup, environment-variable table, webhook configuration, first-admin SQL and operational checklist.

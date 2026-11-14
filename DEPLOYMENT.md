@@ -1,6 +1,6 @@
 # Vercel deployment (Next.js + Neon)
 
-This project is configured for Vercel's Next.js runtime and Neon PostgreSQL. Vercel functions run in Mumbai (`bom1`); choose a Neon region close to your users, preferably AWS Asia Pacific Mumbai or Singapore, to reduce database latency. Production migrations are manual and must be applied before deploying code that uses the new schema.
+This project is configured for Vercel's Next.js runtime and Neon PostgreSQL. Vercel functions run in Mumbai (`bom1`); choose a Neon region close to your users, preferably AWS Asia Pacific Mumbai or Singapore, to reduce database latency. Vercel runs the reviewed production migrations automatically before each build.
 
 ## Prerequisites
 
@@ -29,7 +29,7 @@ Create a Neon production project/branch in Mumbai or Singapore, as close to Verc
 
 Keep TLS enabled and do not add either connection string to source control.
 
-## 3. Migrate and seed before deploying
+## 3. Configure automatic migrations and seed before deploying
 
 From the local project directory, set the production connection values only in your shell. In PowerShell:
 
@@ -41,7 +41,7 @@ npm run db:migrate:prod
 npm run db:seed:prod
 ```
 
-The migration command refuses to run without `DATABASE_URL_UNPOOLED`. Review SQL migrations before applying them. The production seed creates only the default categories and store settings; it does not add demo products. Never run the demo `db:seed` against production.
+The migration command refuses to run without `DATABASE_URL_UNPOOLED`. Add both connection strings to Vercel as Production environment variables. The Vercel build runs `npm run db:migrate:prod` automatically before `next build`; code-only deployments simply find no pending migrations. Review SQL migrations before pushing them. The production seed creates only the default categories and store settings; it does not add demo products. Never run the demo `db:seed` against production.
 
 Before migrating an existing Neon database, check its migration ledger:
 
@@ -62,10 +62,10 @@ In Vercel, choose **Add New → Project**, import the GitHub repository, and con
 - Framework preset: **Next.js**
 - Root directory: repository root (the directory containing `package.json`)
 - Install command: `npm ci`
-- Build command: `npm run build` (or leave the Next.js default)
+- Build command: `npm run vercel-build` (also configured in `vercel.json`)
 - Output directory: leave the Next.js default
 
-Do not set a standalone or static export output. `vercel.json` selects Mumbai, configures function limits, security headers, and the daily cleanup cron.
+Add `DATABASE_URL_UNPOOLED` using the direct/non-pooled Neon connection string. Keep it server-only and do not expose it through a `NEXT_PUBLIC_` variable. Do not set a standalone or static export output. `vercel.json` selects Mumbai, runs migrations before builds, configures function limits, security headers, and the daily cleanup cron.
 
 ## 5. Set up Resend email
 
