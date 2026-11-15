@@ -64,19 +64,19 @@ export async function POST(request: Request) {
       const configRows = await tx.select().from(settings);
       const config = new Map(configRows.map((row) => [row.key, row.value]));
       const shippingThreshold = Number(config.get("free_shipping_threshold") ?? 200000);
-      const shippingCharge = Number(config.get("shipping_charge") ?? 9900);
       const taxPercent = Number(config.get("tax_percent") ?? 0);
       const [userCart] = await tx.select({ total: count() }).from(cartItems).where(eq(cartItems.userId, user.id));
       if (!userCart?.total) throw new Error("Your cart is empty.");
       const cart = await tx.select({
         productId: products.id, name: products.name, sku: products.sku, price: products.price,
-        discountPrice: products.discountPrice, quantity: cartItems.quantity, imageUrl: productImages.url,
+        discountPrice: products.discountPrice, shippingPrice: products.shippingPrice, quantity: cartItems.quantity, imageUrl: productImages.url,
       }).from(cartItems).innerJoin(products, eq(cartItems.productId, products.id))
         .leftJoin(productImages, and(eq(productImages.productId, products.id), eq(productImages.isMain, true)))
         .where(and(eq(cartItems.userId, user.id), eq(products.isActive, true)));
       if (!cart.length) throw new Error("Your cart is empty.");
       const subtotal = cart.reduce((sum, item) => sum + (item.discountPrice ?? item.price) * item.quantity, 0);
-      const shipping = subtotal >= shippingThreshold ? 0 : shippingCharge;
+      const itemShipping = cart.reduce((sum, item) => sum + item.shippingPrice * item.quantity, 0);
+      const shipping = subtotal >= shippingThreshold ? 0 : itemShipping;
       const tax = Math.round(subtotal * taxPercent / 100);
       let discount = 0;
       let coupon: typeof coupons.$inferSelect | undefined;

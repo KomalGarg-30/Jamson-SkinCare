@@ -15,7 +15,6 @@ async function seedProduction() {
   }
   for (const [key, value] of [
     ["store_name", process.env.STORE_NAME || "Decotrin"],
-    ["shipping_charge", "9900"],
     ["free_shipping_threshold", "200000"],
     ["tax_percent", "0"],
     ["return_window_days", process.env.RETURN_WINDOW_DAYS || "7"],

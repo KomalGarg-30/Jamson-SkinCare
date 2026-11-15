@@ -158,7 +158,7 @@ After the first administrator exists, use **Admin → Users** to promote other r
 - Admin catalog and category management, signed ImageKit product uploads, ImageKit-hosted return-photo uploads, order/customer/user/return/review/coupon/banner/settings management, low-stock indicators and sales chart.
 - Responsive layouts, accessible labels, loading/empty/error states, metadata, sitemap and robots policy.
 
-Prices are stored as integer paise. Store settings for shipping and tax can be edited in **Admin → Settings**. Product image upload requires the ImageKit values; Razorpay checkout requires all Razorpay keys and webhook configuration. Cash on delivery remains available independently. Admin upload authentication, file ownership/folder checks, image-size limits, image-count limits and image deletion are verified on the server.
+Prices and per-product shipping prices are stored as integer paise. Product shipping prices are configured in **Admin → Products** and default to free shipping; the free-shipping threshold and tax can be edited in **Admin → Settings**. Product image upload requires the ImageKit values; Razorpay checkout requires all Razorpay keys and webhook configuration. Cash on delivery remains available independently. Admin upload authentication, file ownership/folder checks, image-size limits, image-count limits and image deletion are verified on the server.
 
 ## Email OTP manual test checklist
 

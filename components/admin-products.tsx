@@ -8,7 +8,7 @@ import { StoreImage } from "@/components/store-image";
 
 type Category = { id: string; name: string };
 type ProductImage = { id?: string; url: string; fileId: string | null; altText: string; position?: number; isMain?: boolean };
-type Product = { id: string; name: string; slug: string; sku: string; price: number; stock: number; isActive: boolean; featured: boolean; categoryId: string; brand: string; description: string; ingredients: string | null; howToUse: string | null; discountPrice: number | null; tags: string[]; images?: ProductImage[] };
+type Product = { id: string; name: string; slug: string; sku: string; price: number; shippingPrice: number; stock: number; isActive: boolean; featured: boolean; categoryId: string; brand: string; description: string; ingredients: string | null; howToUse: string | null; discountPrice: number | null; tags: string[]; images?: ProductImage[] };
 type ImageItem = { key: string; url: string; fileId: string; altText: string; status: "uploading" | "uploaded" | "error"; progress: number; file?: File; previewUrl?: string; error?: string };
 type UploadConfig = { token: string; expire: number; signature: string; publicKey: string; urlEndpoint: string; folder: string; maxImageSizeMb: number; maxImagesPerProduct: number };
 
@@ -191,6 +191,7 @@ export function AdminProducts() {
       }
       const price = Math.round(Number(fields.get("price")) * 100);
       const discountPrice = fields.get("discountPrice") ? Math.round(Number(fields.get("discountPrice")) * 100) : null;
+      const shippingPrice = Math.round(Number(fields.get("shippingPrice") || 0) * 100);
       if (discountPrice !== null && discountPrice >= price) {
         setError("Sale price must be less than the regular price.");
         return;
@@ -202,6 +203,7 @@ export function AdminProducts() {
         brand: String(fields.get("brand")), sku: String(fields.get("sku")),
         price,
         discountPrice,
+        shippingPrice,
         stock: Number(fields.get("stock")), featured: fields.get("featured") === "on",
         isActive: fields.get("isActive") === "on", tags: String(fields.get("tags") || "").split(",").map((tag) => tag.trim()).filter(Boolean),
         images: images.map(({ url, fileId, altText }) => ({ url, fileId, altText })),
@@ -247,6 +249,7 @@ export function AdminProducts() {
       <label className="grid gap-1 text-sm"><span>SKU / product code <Required /></span><input className="field" name="sku" required minLength={2} placeholder="e.g. JAM-0001" defaultValue={editing?.sku || ""} /><span className="text-xs text-ink/55">Your own unique code; it cannot be used for another product.</span></label>
       <label className="grid gap-1 text-sm"><span>Regular price (₹) <Required /></span><input className="field" name="price" type="number" min="0.01" step="0.01" required placeholder="e.g. 499" defaultValue={editing ? (editing.price / 100).toFixed(2) : ""} /></label>
       <label className="grid gap-1 text-sm"><span>Sale price (₹) <Optional /></span><input className="field" name="discountPrice" type="number" min="0.01" step="0.01" placeholder="Leave blank if no sale" defaultValue={editing?.discountPrice ? (editing.discountPrice / 100).toFixed(2) : ""} /><span className="text-xs text-ink/55">If entered, it must be lower than the regular price.</span></label>
+      <label className="grid gap-1 text-sm"><span>Shipping price (₹) <Optional /></span><input className="field" name="shippingPrice" type="number" min="0" step="0.01" placeholder="0.00" defaultValue={editing ? (editing.shippingPrice / 100).toFixed(2) : ""} /><span className="text-xs text-ink/55">Leave blank for free shipping.</span></label>
       <label className="grid gap-1 text-sm"><span>Stock quantity (units) <Required /></span><input className="field" name="stock" type="number" min="0" required placeholder="e.g. 25" defaultValue={editing ? editing.stock : ""} /><span className="text-xs text-ink/55">How many units are available to sell. Enter 0 if sold out.</span></label>
       <label className="grid gap-1 text-sm"><span>Product tags <Optional /></span><input className="field" name="tags" placeholder="e.g. cleanser, hydrating, sensitive skin" defaultValue={editing?.tags.join(", ") || ""} /><span className="text-xs text-ink/55">Optional search keywords. Separate each tag with a comma.</span></label>
       <label className="grid gap-1 text-sm sm:col-span-2 lg:col-span-3"><span>Product description <Required /></span><textarea className="field" name="description" rows={3} minLength={10} required placeholder="Describe what the product is and what it does." defaultValue={editing?.description || ""} /></label>

@@ -1,0 +1,2 @@
+ALTER TABLE "products" ADD COLUMN "shipping_price" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "products" ADD CONSTRAINT "products_shipping_price_nonnegative" CHECK ("products"."shipping_price" >= 0);

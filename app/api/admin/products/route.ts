@@ -19,7 +19,8 @@ const productSchema = z.object({
   name: z.string().trim().min(2).max(200), slug: z.string().trim().min(2).max(220).optional(),
   description: z.string().min(10), ingredients: z.string().optional(), howToUse: z.string().optional(),
   categoryId: z.uuid(), brand: z.string().min(1).max(100), price: z.number().int().positive(),
-  discountPrice: z.number().int().positive().nullable().optional(), sku: z.string().min(2).max(80),
+  discountPrice: z.number().int().positive().nullable().optional(), shippingPrice: z.number().int().min(0).default(0),
+  sku: z.string().min(2).max(80),
   stock: z.number().int().min(0), featured: z.boolean().default(false), isActive: z.boolean().default(true),
   tags: z.array(z.string().max(40)).max(20).default([]), images: z.array(imageSchema).max(20).optional(),
 }).refine((data) => data.discountPrice == null || data.discountPrice < data.price, {

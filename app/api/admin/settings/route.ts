@@ -7,7 +7,6 @@ import { z } from "zod";
 
 const schema = z.object({
   store_name: z.string().trim().min(2).max(120),
-  shipping_charge: z.coerce.number().int().min(0),
   free_shipping_threshold: z.coerce.number().int().min(0),
   tax_percent: z.coerce.number().min(0).max(100),
 });

@@ -11,7 +11,7 @@ export async function GET() {
     const user = await requireUser();
     const items = await db.select({
       id: cartItems.id, quantity: cartItems.quantity, productId: products.id, name: products.name,
-      slug: products.slug, price: products.price, discountPrice: products.discountPrice, stock: products.stock,
+      slug: products.slug, price: products.price, discountPrice: products.discountPrice, shippingPrice: products.shippingPrice, stock: products.stock,
       image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY is_main DESC, position ASC, created_at ASC, id ASC LIMIT 1)`,
     }).from(cartItems).innerJoin(products, eq(cartItems.productId, products.id))
       .where(and(eq(cartItems.userId, user.id), eq(products.isActive, true)));
@@ -19,7 +19,8 @@ export async function GET() {
     const subtotal = distinctItems.reduce((sum, item) => sum + (item.discountPrice ?? item.price) * item.quantity, 0);
     const configRows = await db.select().from(settings);
     const config = new Map(configRows.map((row) => [row.key, row.value]));
-    const shipping = subtotal >= Number(config.get("free_shipping_threshold") ?? 200000) ? 0 : Number(config.get("shipping_charge") ?? 9900);
+    const itemShipping = distinctItems.reduce((sum, item) => sum + item.shippingPrice * item.quantity, 0);
+    const shipping = subtotal >= Number(config.get("free_shipping_threshold") ?? 200000) ? 0 : itemShipping;
     const tax = Math.round(subtotal * Number(config.get("tax_percent") ?? 0) / 100);
     return NextResponse.json({ items: distinctItems, subtotal, shipping, tax, total: subtotal + shipping + tax });
   } catch (error) {

@@ -11,14 +11,15 @@ export async function POST(request: Request) {
     const user = await requireUser();
     const data = z.object({ code: z.string().trim().min(1).max(50) }).parse(await request.json());
     const items = await db.select({
-      quantity: cartItems.quantity, price: products.price, discountPrice: products.discountPrice,
+      quantity: cartItems.quantity, price: products.price, discountPrice: products.discountPrice, shippingPrice: products.shippingPrice,
     }).from(cartItems).innerJoin(products, eq(cartItems.productId, products.id))
       .where(and(eq(cartItems.userId, user.id), eq(products.isActive, true)));
     if (!items.length) return NextResponse.json({ error: "Your bag is empty." }, { status: 400 });
     const subtotal = items.reduce((sum, item) => sum + (item.discountPrice ?? item.price) * item.quantity, 0);
     const configRows = await db.select().from(settings);
     const config = new Map(configRows.map((row) => [row.key, row.value]));
-    const shipping = subtotal >= Number(config.get("free_shipping_threshold") ?? 200000) ? 0 : Number(config.get("shipping_charge") ?? 9900);
+    const itemShipping = items.reduce((sum, item) => sum + item.shippingPrice * item.quantity, 0);
+    const shipping = subtotal >= Number(config.get("free_shipping_threshold") ?? 200000) ? 0 : itemShipping;
     const tax = Math.round(subtotal * Number(config.get("tax_percent") ?? 0) / 100);
     const [coupon] = await db.select().from(coupons).where(eq(coupons.code, data.code.toUpperCase())).limit(1);
     if (!coupon || !coupon.isActive || (coupon.expiresAt && coupon.expiresAt < new Date()) ||
