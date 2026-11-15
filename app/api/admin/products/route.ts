@@ -15,7 +15,7 @@ const imageSchema = z.object({
   fileId: z.string().min(1).max(200),
   altText: z.string().trim().max(255).default(""),
 });
-const productSchema = z.object({
+const productFieldsSchema = z.object({
   name: z.string().trim().min(2).max(200), slug: z.string().trim().min(2).max(220).optional(),
   description: z.string().min(10), ingredients: z.string().optional(), howToUse: z.string().optional(),
   categoryId: z.uuid(), brand: z.string().min(1).max(100), price: z.number().int().positive(),
@@ -23,7 +23,8 @@ const productSchema = z.object({
   sku: z.string().min(2).max(80),
   stock: z.number().int().min(0), featured: z.boolean().default(false), isActive: z.boolean().default(true),
   tags: z.array(z.string().max(40)).max(20).default([]), images: z.array(imageSchema).max(20).optional(),
-}).refine((data) => data.discountPrice == null || data.discountPrice < data.price, {
+});
+const productSchema = productFieldsSchema.refine((data) => data.discountPrice == null || data.discountPrice < data.price, {
   path: ["discountPrice"],
   message: "Sale price must be less than the regular price.",
 });
@@ -114,7 +115,7 @@ export async function PATCH(request: Request) {
   try {
     await requireAdmin();
     const body = z.object({ id: z.uuid() }).passthrough().parse(await request.json());
-    const data = productSchema.partial().parse(body);
+    const data = productFieldsSchema.partial().parse(body);
     const [existing] = await db.select({ price: products.price, discountPrice: products.discountPrice, isActive: products.isActive })
       .from(products).where(eq(products.id, body.id)).limit(1);
     if (!existing) return NextResponse.json({ error: "Product not found." }, { status: 404 });
