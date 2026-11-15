@@ -28,7 +28,7 @@ const productSchema = z.object({
   message: "Sale price must be less than the regular price.",
 });
 
-async function validateImages(images: z.infer<typeof imageSchema>[], isActive: boolean) {
+async function validateImages(images: z.infer<typeof imageSchema>[], isActive: boolean, trustedFileIds = new Set<string>()) {
   const { MAX_IMAGES_PER_PRODUCT } = getEnv();
   if (images.length > MAX_IMAGES_PER_PRODUCT) {
     return `A product can have up to ${MAX_IMAGES_PER_PRODUCT} images.`;
@@ -41,6 +41,7 @@ async function validateImages(images: z.infer<typeof imageSchema>[], isActive: b
   const client = getImageKitClient();
   const endpoint = new URL(config.urlEndpoint);
   for (const image of images) {
+    if (trustedFileIds.has(image.fileId)) continue;
     const url = new URL(image.url);
     if (url.protocol !== "https:" || url.hostname !== endpoint.hostname) return "Product images must be hosted on ImageKit.";
     const file = await client.files.get(image.fileId);
@@ -123,8 +124,12 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Sale price must be less than the regular price." }, { status: 400 });
     }
     const images = data.images;
+    let existingImages: { fileId: string | null }[] = [];
     if (images) {
-      const imageError = await validateImages(images, data.isActive ?? existing.isActive);
+      existingImages = await db.select({ fileId: productImages.fileId }).from(productImages)
+        .where(eq(productImages.productId, body.id));
+      const existingFileIds = new Set(existingImages.map((image) => image.fileId).filter((fileId): fileId is string => Boolean(fileId)));
+      const imageError = await validateImages(images, data.isActive ?? existing.isActive, existingFileIds);
       if (imageError) return NextResponse.json({ error: imageError }, { status: 400 });
     }
     if (data.isActive === true && !images) {
@@ -133,8 +138,6 @@ export async function PATCH(request: Request) {
       if (!imageCount?.count) return NextResponse.json({ error: "Add at least one product image before publishing." }, { status: 400 });
     }
     if (images) {
-      const existingImages = await db.select({ fileId: productImages.fileId }).from(productImages)
-        .where(eq(productImages.productId, body.id));
       const incomingFileIds = new Set(images.map((image) => image.fileId));
       if (existingImages.some((image) => image.fileId && !incomingFileIds.has(image.fileId))) {
         return NextResponse.json({ error: "Remove stored images using the image manager so their ImageKit files are deleted too." }, { status: 400 });
