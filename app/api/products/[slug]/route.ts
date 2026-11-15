@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { categories, productImages, products, reviews, users } from "@/db/schema";
 import { db } from "@/lib/db";
@@ -24,7 +24,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
       db.select({
         id: productImages.id, url: productImages.url, altText: productImages.altText,
         position: productImages.position, isMain: productImages.isMain,
-      }).from(productImages).where(eq(productImages.productId, product.products.id)).orderBy(productImages.position),
+      }).from(productImages).where(eq(productImages.productId, product.products.id))
+        .orderBy(desc(productImages.isMain), asc(productImages.position), asc(productImages.createdAt), asc(productImages.id)),
       db.select({ id: reviews.id, rating: reviews.rating, title: reviews.title, body: reviews.body, createdAt: reviews.createdAt, customer: users.name })
         .from(reviews).innerJoin(users, eq(reviews.userId, users.id))
         .where(and(eq(reviews.productId, product.products.id), eq(reviews.isApproved, true))),

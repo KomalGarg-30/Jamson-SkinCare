@@ -12,8 +12,8 @@ export async function GET() {
     const items = await db.select({
       id: products.id, name: products.name, slug: products.slug,
       price: products.price, discountPrice: products.discountPrice,
-      image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`,
-      secondImage: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC OFFSET 1 LIMIT 1)`,
+      image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY is_main DESC, position ASC, created_at ASC, id ASC LIMIT 1)`,
+      secondImage: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY is_main DESC, position ASC, created_at ASC, id ASC OFFSET 1 LIMIT 1)`,
     }).from(wishlistItems).innerJoin(products, eq(wishlistItems.productId, products.id))
       .where(and(eq(wishlistItems.userId, user.id), eq(products.isActive, true)));
     return NextResponse.json({ items });

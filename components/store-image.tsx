@@ -18,7 +18,8 @@ export function StoreImage({ src, alt, className = "", width = 800, height = 800
   useEffect(() => setFailed(false), [src]);
   const candidate = src || fallbackImage;
   const isLocalImage = candidate.startsWith("/") && !candidate.startsWith("//");
-  const url = failed || (!isLocalImage && !candidate.startsWith("blob:") && !candidate.startsWith("https://ik.imagekit.io/"))
+  const isSupportedRemoteImage = candidate.startsWith("https://ik.imagekit.io/") || candidate.startsWith("https://images.unsplash.com/");
+  const url = failed || (!isLocalImage && !candidate.startsWith("blob:") && !isSupportedRemoteImage)
     ? fallbackImage
     : candidate;
   const candidates = [400, 800, 1200];

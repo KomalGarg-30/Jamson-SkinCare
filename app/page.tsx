@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { ArrowRight, Leaf, ShieldCheck, Sparkles } from "lucide-react";
-import { banners, categories, products, wishlistItems } from "@/db/schema";
+import { banners, categories, productImages, products, wishlistItems } from "@/db/schema";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { getSetupError } from "@/lib/env";
@@ -14,22 +14,38 @@ export default async function HomePage() {
   const setupError = getSetupError();
   if (setupError) return <section className="container-page py-28 text-center"><p className="text-xs font-semibold uppercase tracking-[.2em] text-sage-dark">Setup required</p><h1 className="mt-4 font-serif text-4xl">Add your store configuration</h1><p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-ink/60">{setupError} Review the setup steps in README.md, then restart the app.</p></section>;
   const session = await getSession();
-  const [categoryList, featured, bestSellers, arrivals, homeBanners, savedProducts] = await Promise.all([
+  const [categoryList, featured, bestSellers, arrivals, homeBanners, savedProducts, imageRows] = await Promise.all([
     db.select().from(categories).where(eq(categories.isActive, true)).orderBy(asc(categories.name)),
-    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock, image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`, secondImage: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC OFFSET 1 LIMIT 1)` })
+    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock })
       .from(products)
       .where(and(eq(products.featured, true), eq(products.isActive, true))).orderBy(desc(products.createdAt)).limit(4),
-    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock, image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`, secondImage: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC OFFSET 1 LIMIT 1)` })
+    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock })
       .from(products)
       .where(eq(products.isActive, true)).orderBy(desc(products.reviewCount)).limit(4),
-    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock, image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`, secondImage: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC OFFSET 1 LIMIT 1)` })
+    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock })
       .from(products)
       .where(eq(products.isActive, true)).orderBy(desc(products.createdAt)).limit(4),
     db.select().from(banners).where(eq(banners.isActive, true)).orderBy(asc(banners.position)).limit(1),
     session
       ? db.select({ productId: wishlistItems.productId }).from(wishlistItems).where(eq(wishlistItems.userId, session.id))
       : Promise.resolve([]),
+    db.select({
+      productId: productImages.productId, id: productImages.id, url: productImages.url,
+    }).from(productImages).orderBy(desc(productImages.isMain), asc(productImages.position), asc(productImages.createdAt), asc(productImages.id)),
   ]);
+  const imagesByProduct = new Map<string, string[]>();
+  for (const image of imageRows) {
+    const images = imagesByProduct.get(image.productId) || [];
+    images.push(image.url);
+    imagesByProduct.set(image.productId, images);
+  }
+  const withImages = <T extends { id: string }>(items: T[]) => items.map((item) => {
+    const images = imagesByProduct.get(item.id) || [];
+    return { ...item, image: images[0] || null, secondImage: images[1] || null };
+  });
+  const featuredWithImages = withImages(featured);
+  const bestSellersWithImages = withImages(bestSellers);
+  const arrivalsWithImages = withImages(arrivals);
   const savedProductIds = new Set(savedProducts.map((item) => item.productId));
   const hero = homeBanners[0];
   const heroHref = (() => {
@@ -70,16 +86,16 @@ export default async function HomePage() {
 
     <section className="bg-white py-20"><div className="container-page">
       <SectionTitle eyebrow="A few good things" title="Made for your daily ritual" href="/shop" />
-      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{featured.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
+      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{featuredWithImages.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
     </div></section>
 
     <section className="container-page py-20"><SectionTitle eyebrow="Loved by you" title="The everyday favourites" href="/shop?sort=popular" />
-      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{bestSellers.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
+      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{bestSellersWithImages.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
     </section>
 
     <section className="bg-[#f1ede5] py-20"><div className="container-page">
       <SectionTitle eyebrow="Just arrived" title="New to the shelf" href="/shop?sort=newest" />
-      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{arrivals.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
+      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{arrivalsWithImages.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
     </div></section>
 
     <section className="container-page grid items-center gap-12 py-20 md:grid-cols-2">

@@ -20,7 +20,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const items = await db.select({
       id: orderItems.id, productName: orderItems.productName, sku: orderItems.sku,
       quantity: orderItems.quantity, unitPrice: orderItems.unitPrice,
-      image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${orderItems.productId} ORDER BY position ASC LIMIT 1)`,
+      image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${orderItems.productId} ORDER BY is_main DESC, position ASC, created_at ASC, id ASC LIMIT 1)`,
     }).from(orderItems).where(eq(orderItems.orderId, id));
     return NextResponse.json({ order, items });
   } catch (error) {

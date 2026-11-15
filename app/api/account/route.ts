@@ -22,11 +22,11 @@ export async function GET() {
       db.select({
         productId: products.id, name: products.name, slug: products.slug, quantity: cartItems.quantity,
         price: products.price, discountPrice: products.discountPrice, stock: products.stock,
-        image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`,
+        image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY is_main DESC, position ASC, created_at ASC, id ASC LIMIT 1)`,
       }).from(cartItems).innerJoin(products, eq(cartItems.productId, products.id))
         .where(eq(cartItems.userId, user.id)),
       db.select({ productId: products.id, name: products.name, slug: products.slug, price: products.price,
-        image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)` })
+        image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY is_main DESC, position ASC, created_at ASC, id ASC LIMIT 1)` })
         .from(wishlistItems).innerJoin(products, eq(wishlistItems.productId, products.id)).where(eq(wishlistItems.userId, user.id)),
       db.select({
         id: reviews.id, productId: reviews.productId, orderId: reviews.orderId, rating: reviews.rating,
@@ -57,7 +57,7 @@ export async function GET() {
       orderIds.length ? db.select({
         id: orderItems.id, orderId: orderItems.orderId, productId: orderItems.productId,
         productName: orderItems.productName, quantity: orderItems.quantity, unitPrice: orderItems.unitPrice,
-        image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${orderItems.productId} ORDER BY position ASC LIMIT 1)`,
+        image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${orderItems.productId} ORDER BY is_main DESC, position ASC, created_at ASC, id ASC LIMIT 1)`,
       }).from(orderItems).where(inArray(orderItems.orderId, orderIds)) : Promise.resolve([]),
       userReturns.length ? db.select({
         returnId: returnItems.returnId, orderItemId: returnItems.orderItemId, quantity: returnItems.quantity,

@@ -12,7 +12,7 @@ export async function GET() {
     const items = await db.select({
       id: cartItems.id, quantity: cartItems.quantity, productId: products.id, name: products.name,
       slug: products.slug, price: products.price, discountPrice: products.discountPrice, stock: products.stock,
-      image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY position ASC LIMIT 1)`,
+      image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY is_main DESC, position ASC, created_at ASC, id ASC LIMIT 1)`,
     }).from(cartItems).innerJoin(products, eq(cartItems.productId, products.id))
       .where(and(eq(cartItems.userId, user.id), eq(products.isActive, true)));
     const distinctItems = Array.from(new Map(items.map((item) => [item.id, item])).values());
