@@ -10,6 +10,7 @@ type Result = { products: Product[]; pages: number; total: number };
 
 export function ShopExplorer() {
   const searchParams = useSearchParams();
+  const categoryParam = searchParams.get("category") || "";
   const toast = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [page, setPage] = useState(1);
@@ -22,6 +23,10 @@ export function ShopExplorer() {
   const [minimum, setMinimum] = useState("");
   const [maximum, setMaximum] = useState("");
   const [rating, setRating] = useState("");
+  useEffect(() => {
+    setCategory(categoryParam);
+    setPage(1);
+  }, [categoryParam]);
   useEffect(() => {
     fetch("/api/wishlist").then(async (response) => {
       if (response.status === 401) return;

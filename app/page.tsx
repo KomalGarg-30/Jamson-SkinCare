@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { ArrowRight, Leaf, ShieldCheck, Sparkles } from "lucide-react";
 import { banners, categories, productImages, products, wishlistItems } from "@/db/schema";
 import { db } from "@/lib/db";
@@ -10,12 +10,14 @@ import { SectionTitle } from "@/components/section-title";
 
 export const dynamic = "force-dynamic";
 
+const navbarCategorySlugs = ["skin-care", "hair-care", "body-care", "health-care"] as const;
+
 export default async function HomePage() {
   const setupError = getSetupError();
   if (setupError) return <section className="container-page py-28 text-center"><p className="text-xs font-semibold uppercase tracking-[.2em] text-sage-dark">Setup required</p><h1 className="mt-4 font-serif text-4xl">Add your store configuration</h1><p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-ink/60">{setupError} Review the setup steps in README.md, then restart the app.</p></section>;
   const session = await getSession();
   const [categoryList, featured, bestSellers, arrivals, homeBanners, savedProducts, imageRows] = await Promise.all([
-    db.select().from(categories).where(eq(categories.isActive, true)).orderBy(asc(categories.name)),
+    db.select().from(categories).where(and(eq(categories.isActive, true), inArray(categories.slug, navbarCategorySlugs))).orderBy(asc(categories.name)),
     db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock })
       .from(products)
       .where(and(eq(products.featured, true), eq(products.isActive, true))).orderBy(desc(products.createdAt)).limit(4),
