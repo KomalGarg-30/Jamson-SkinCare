@@ -1,115 +1,38 @@
 import Link from "next/link";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { ArrowRight, Leaf, ShieldCheck, Sparkles } from "lucide-react";
-import { banners, categories, productImages, products, wishlistItems } from "@/db/schema";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { ArrowRight, Check, Leaf, ShieldCheck, Sparkles } from "lucide-react";
+import { banners, categories, products, reviews, settings, users } from "@/db/schema";
 import { db } from "@/lib/db";
-import { getSession } from "@/lib/auth";
 import { getSetupError } from "@/lib/env";
-import { ProductCard } from "@/components/product-card";
-import { SectionTitle } from "@/components/section-title";
+import { ProductCard, type ProductSummary } from "@/components/product-card";
+import { CategoryCard } from "@/components/category-card";
 
-export const dynamic = "force-dynamic";
-
-const navbarCategorySlugs = ["skin-care", "hair-care", "body-care", "health-care"] as const;
-
+export const revalidate = 60;
+const categorySlugs = ["skin-care", "hair-care", "body-care", "health-care"] as const;
+const productFields = { id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock, categoryName: categories.name, categorySlug: categories.slug, image: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY is_main DESC, position ASC, created_at ASC, id ASC LIMIT 1)`, secondImage: sql<string | null>`(SELECT url FROM product_images WHERE product_id = ${products.id} ORDER BY is_main DESC, position ASC, created_at ASC, id ASC OFFSET 1 LIMIT 1)` };
 export default async function HomePage() {
   const setupError = getSetupError();
-  if (setupError) return <section className="container-page py-28 text-center"><p className="text-xs font-semibold uppercase tracking-[.2em] text-sage-dark">Setup required</p><h1 className="mt-4 font-serif text-4xl">Add your store configuration</h1><p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-ink/60">{setupError} Review the setup steps in README.md, then restart the app.</p></section>;
-  const session = await getSession();
-  const [categoryList, featured, bestSellers, arrivals, homeBanners, savedProducts, imageRows] = await Promise.all([
-    db.select().from(categories).where(and(eq(categories.isActive, true), inArray(categories.slug, navbarCategorySlugs))).orderBy(asc(categories.name)),
-    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock })
-      .from(products)
-      .where(and(eq(products.featured, true), eq(products.isActive, true))).orderBy(desc(products.createdAt)).limit(4),
-    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock })
-      .from(products)
-      .where(eq(products.isActive, true)).orderBy(desc(products.reviewCount)).limit(4),
-    db.select({ id: products.id, name: products.name, slug: products.slug, price: products.price, discountPrice: products.discountPrice, rating: products.rating, reviewCount: products.reviewCount, stock: products.stock })
-      .from(products)
-      .where(eq(products.isActive, true)).orderBy(desc(products.createdAt)).limit(4),
+  if (setupError) return <section className="container-page py-28 text-center"><p className="text-xs font-semibold uppercase tracking-[.2em] text-sage-dark">Setup required</p><h1 className="mt-4 font-serif text-4xl">Add your store configuration</h1><p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-ink/60">{setupError} Review README.md, then restart the app.</p></section>;
+  const [categoryList, heroRows, bestsellers, arrivals, reviewRows, settingRows] = await Promise.all([
+    db.select().from(categories).where(and(eq(categories.isActive, true), inArray(categories.slug, categorySlugs))).orderBy(asc(categories.name)),
     db.select().from(banners).where(eq(banners.isActive, true)).orderBy(asc(banners.position)).limit(1),
-    session
-      ? db.select({ productId: wishlistItems.productId }).from(wishlistItems).where(eq(wishlistItems.userId, session.id))
-      : Promise.resolve([]),
-    db.select({
-      productId: productImages.productId, id: productImages.id, url: productImages.url,
-    }).from(productImages).orderBy(desc(productImages.isMain), asc(productImages.position), asc(productImages.createdAt), asc(productImages.id)),
+    db.select(productFields).from(products).innerJoin(categories, eq(products.categoryId, categories.id)).where(and(eq(products.isActive, true), eq(products.featured, true))).orderBy(desc(products.reviewCount), desc(products.createdAt)).limit(8),
+    db.select(productFields).from(products).innerJoin(categories, eq(products.categoryId, categories.id)).where(eq(products.isActive, true)).orderBy(desc(products.createdAt)).limit(8),
+    db.select({ firstName: sql<string>`split_part(${users.name}, ' ', 1)`, rating: reviews.rating, body: reviews.body }).from(reviews).innerJoin(users, eq(reviews.userId, users.id)).where(eq(reviews.isApproved, true)).orderBy(desc(reviews.createdAt)).limit(3),
+    db.select().from(settings),
   ]);
-  const imagesByProduct = new Map<string, string[]>();
-  for (const image of imageRows) {
-    const images = imagesByProduct.get(image.productId) || [];
-    images.push(image.url);
-    imagesByProduct.set(image.productId, images);
-  }
-  const withImages = <T extends { id: string }>(items: T[]) => items.map((item) => {
-    const images = imagesByProduct.get(item.id) || [];
-    return { ...item, image: images[0] || null, secondImage: images[1] || null };
-  });
-  const featuredWithImages = withImages(featured);
-  const bestSellersWithImages = withImages(bestSellers);
-  const arrivalsWithImages = withImages(arrivals);
-  const savedProductIds = new Set(savedProducts.map((item) => item.productId));
-  const hero = homeBanners[0];
-  const heroHref = (() => {
-    if (!hero?.linkUrl) return "/shop";
-    try {
-      const link = new URL(hero.linkUrl);
-      return link.protocol === "https:" || link.protocol === "http:" ? link.href : "/shop";
-    } catch {
-      return hero.linkUrl.startsWith("/") && !hero.linkUrl.startsWith("//") ? hero.linkUrl : "/shop";
-    }
-  })();
-  return <div>
-    <section className="relative min-h-[570px] overflow-hidden bg-[#e8eee6]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_38%,#d4dfd0_0,transparent_34%)]" />
-      <div className="container-page relative grid min-h-[570px] items-center gap-8 py-16 md:grid-cols-[1.05fr_.95fr]">
-        <div className="max-w-xl">
-          <p className="mb-5 text-xs font-semibold uppercase tracking-[.24em] text-sage-dark">Little rituals, a lot of care</p>
-          <h1 className="font-serif text-5xl leading-[1.08] text-ink sm:text-6xl">{hero?.title || "Feel good in the skin you’re in."}</h1>
-          <p className="mt-6 max-w-lg text-base leading-7 text-ink/70">{hero?.subtitle || "Thoughtfully chosen skincare, haircare and everyday wellness for the moments that are just yours."}</p>
-          <div className="mt-8 flex flex-wrap gap-3"><Link className="inline-flex items-center gap-2 rounded-full bg-sage-dark px-7 py-3.5 text-sm font-medium text-white hover:bg-ink" href={heroHref}>Explore the collection <ArrowRight size={17} /></Link><Link className="inline-flex items-center rounded-full border border-ink/20 px-7 py-3.5 text-sm font-medium" href="/shop?category=skin-care">Find your routine</Link></div>
-          <p className="mt-8 flex items-center gap-2 text-sm text-ink/60"><ShieldCheck size={17} className="text-sage-dark" />Kind ingredients. Feel-good essentials.</p>
-        </div>
-        <div className="relative mx-auto w-full max-w-[500px]">
-          <div className="absolute -left-3 top-12 h-52 w-52 rounded-full bg-[#d5c7b5]/55 blur-2xl" />
-          <img src={hero?.imageUrl || "/images/product-default.svg"} alt={hero?.title || "A calm, botanical skincare arrangement"} className="relative aspect-[4/3] w-full rounded-[2rem] object-cover shadow-xl shadow-sage/10" />
-          <div className="absolute -bottom-5 -left-4 rounded-2xl bg-white px-5 py-4 shadow-lg"><p className="font-serif text-lg">Your everyday, elevated</p><p className="mt-1 text-xs text-ink/55">Gentle care, made simple</p></div>
-        </div>
-      </div>
-    </section>
-
-    <section className="container-page py-20">
-      <SectionTitle eyebrow="Find your feel-good" title="Care for every part of you" description="Explore thoughtful formulas made to fit into the routine you already love." />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{categoryList.map((category) => <Link key={category.id} href={`/shop?category=${category.slug}`} className="group relative overflow-hidden rounded-2xl bg-sand">
-        <img src={category.imageUrl || "/images/product-default.svg"} alt="" className="aspect-[1.25] w-full object-cover transition duration-500 group-hover:scale-105" />
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent p-5 pt-14 text-white"><h3 className="font-serif text-2xl">{category.name}</h3><span className="mt-2 inline-flex items-center gap-1 text-xs">Discover <ArrowRight size={14} /></span></div>
-      </Link>)}</div>
-    </section>
-
-    <section className="bg-white py-20"><div className="container-page">
-      <SectionTitle eyebrow="A few good things" title="Made for your daily ritual" href="/shop" />
-      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{featuredWithImages.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
-    </div></section>
-
-    <section className="container-page py-20"><SectionTitle eyebrow="Loved by you" title="The everyday favourites" href="/shop?sort=popular" />
-      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{bestSellersWithImages.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
-    </section>
-
-    <section className="bg-[#f1ede5] py-20"><div className="container-page">
-      <SectionTitle eyebrow="Just arrived" title="New to the shelf" href="/shop?sort=newest" />
-      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">{arrivalsWithImages.map((product) => <ProductCard key={product.id} product={product} initialWishlisted={savedProductIds.has(product.id)} />)}</div>
-    </div></section>
-
-    <section className="container-page grid items-center gap-12 py-20 md:grid-cols-2">
-      <div><p className="mb-3 text-xs font-semibold uppercase tracking-[.2em] text-sage-dark">The Decotrin difference</p><h2 className="font-serif text-4xl leading-tight">Care that feels like care.</h2><p className="mt-5 max-w-lg leading-7 text-ink/65">We believe a good routine should feel uncomplicated. So we choose effective, thoughtful essentials and let the little rituals do their thing.</p>
-        <div className="mt-8 grid gap-5 sm:grid-cols-2"><div className="flex gap-3"><Leaf className="shrink-0 text-sage-dark" /><div><h3 className="font-medium">Thoughtful formulas</h3><p className="mt-1 text-sm text-ink/60">Straightforward ingredients that earn their place.</p></div></div><div className="flex gap-3"><Sparkles className="shrink-0 text-sage-dark" /><div><h3 className="font-medium">Everyday easy</h3><p className="mt-1 text-sm text-ink/60">Little moments of care, without the fuss.</p></div></div></div>
-      </div>
-      <div className="rounded-[2rem] bg-[#e5e9df] p-8 sm:p-12"><p className="font-serif text-2xl leading-relaxed">“My routine finally feels like something I look forward to. Simple, gentle, and just right for me.”</p><div className="mt-8 flex items-center gap-3"><div className="h-11 w-11 rounded-full bg-sage/20" /><div><p className="text-sm font-semibold">A happy customer</p><p className="text-xs text-ink/55">Verified purchase</p></div></div></div>
-    </section>
-
-    <section className="container-page pb-20"><div className="rounded-[2rem] bg-sage-dark px-7 py-12 text-center text-white md:px-16">
-      <p className="text-xs font-semibold uppercase tracking-[.2em] text-white/70">A little note from us</p><h2 className="mt-3 font-serif text-3xl md:text-4xl">Make room for feel-good.</h2><p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-white/75">Sign up for thoughtful notes, new arrivals and a little something for your next order.</p>
-      <form action="/api/newsletter" method="post" className="mx-auto mt-7 flex max-w-md flex-col gap-2 sm:flex-row"><label htmlFor="newsletter-email" className="sr-only">Email address</label><input id="newsletter-email" type="email" name="email" required placeholder="Your email address" className="min-w-0 flex-1 rounded-full border-0 bg-white px-5 py-3 text-sm text-ink outline-none" /><button className="rounded-full bg-ink px-6 py-3 text-sm font-medium text-white hover:bg-ink/80">Join the list</button></form>
-    </div></section>
+  const setting = Object.fromEntries(settingRows.map((item) => [item.key, item.value]));
+  const hero = heroRows[0]; const featured = bestsellers.length >= 4 ? bestsellers : [];
+  const trustShipping = setting.free_shipping_threshold ? `Free shipping above ₹${(Number(setting.free_shipping_threshold) / 100).toLocaleString("en-IN")}` : "Free shipping above ₹999";
+  const card = (product: typeof bestsellers[number]) => <ProductCard key={product.id} product={product as ProductSummary} />;
+  return <div>{setting.announcement_text && <div className="bg-sage-dark px-4 py-2 text-center text-xs text-white">{setting.announcement_text}</div>}
+    <section className="container-page grid items-center gap-10 py-12 md:min-h-[calc(100vh-4rem)] md:grid-cols-[.9fr_1.1fr] md:py-16"><div className="max-w-xl"><p className="mb-5 text-xs font-semibold uppercase tracking-[.24em] text-sage-dark">Thoughtful care, every day</p><h1 className="font-serif text-5xl leading-[1.05] sm:text-6xl">{setting.homepage_headline || hero?.title || "Feel good in the skin you're in."}</h1><p className="mt-6 max-w-lg text-lg leading-8 text-ink/65">{setting.homepage_subheadline || hero?.subtitle || "Simple, considered essentials for skin, hair, body and everyday wellness."}</p><div className="mt-8 flex flex-wrap gap-3"><Link className="button-primary" href={setting.homepage_primary_link || "/shop"}>Shop all <ArrowRight size={17} /></Link><Link className="button-secondary" href={setting.homepage_secondary_link || "/shop?category=skin-care"}>Shop skin care</Link></div><div className="mt-8 grid grid-cols-3 gap-3 text-xs text-ink/60"><span className="flex gap-2"><Check size={16} className="shrink-0 text-sage" />{trustShipping}</span><span className="flex gap-2"><Check size={16} className="shrink-0 text-sage" />Easy 7-day returns</span><span className="flex gap-2"><Check size={16} className="shrink-0 text-sage" />Secure payments</span></div></div><div className="relative overflow-hidden rounded-[2rem] bg-sand"><img src={hero?.imageUrl || "/images/skin-care.svg"} alt={hero?.title || "Decotrin skincare essentials"} width={1000} height={800} fetchPriority="high" className="aspect-[4/3] w-full object-cover" /></div></section>
+    <section className="container-page py-16"><div className="mb-8 flex items-end justify-between"><div><p className="eyebrow">Explore</p><h2 className="mt-2 font-serif text-4xl">Shop by category</h2></div><Link href="/shop" className="hidden text-sm text-sage-dark sm:block">View all <ArrowRight size={15} className="inline" /></Link></div><div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">{categoryList.map((category) => <CategoryCard key={category.id} category={category} />)}</div></section>
+    {featured.length > 0 && <ProductSection title="Bestsellers" href="/shop?sort=popular" products={featured} render={card} />}
+    {arrivals.length > 0 && <ProductSection title="New arrivals" href="/shop?sort=newest" products={arrivals.slice(0, 8)} render={card} muted />}
+    <section className="container-page py-16"><div className="grid gap-8 rounded-3xl bg-sand px-6 py-10 md:grid-cols-3 md:px-12"><PromiseFeature icon={<Leaf />} title="Thoughtful formulas" text="Ingredients that earn their place." /><PromiseFeature icon={<Sparkles />} title="Everyday easy" text="Care without the fuss." /><PromiseFeature icon={<ShieldCheck />} title="Cared for by people" text="Here when you need us." /></div></section>
+    {reviewRows.length > 0 && <section className="container-page py-8"><p className="eyebrow">Real routines</p><h2 className="mt-2 font-serif text-4xl">Kind words</h2><div className="mt-7 grid gap-4 md:grid-cols-3">{reviewRows.map((review) => <blockquote key={`${review.firstName}-${review.body}`} className="rounded-2xl bg-white p-6"><p className="text-amber-600">{"★".repeat(review.rating)}</p><p className="mt-4 leading-7 text-ink/75">“{review.body}”</p><footer className="mt-5 text-sm font-medium">{review.firstName} · Verified purchase</footer></blockquote>)}</div></section>}
   </div>;
 }
+function ProductSection<T extends { id: string }>({ title, href, products: items, render, muted = false }: { title: string; href: string; products: T[]; render: (product: T) => React.ReactNode; muted?: boolean }) { return <section className={muted ? "bg-white py-16" : "container-page py-16"}><div className={muted ? "container-page" : ""}><div className="mb-8 flex items-end justify-between"><h2 className="font-serif text-4xl">{title}</h2><Link href={href} className="text-sm text-sage-dark">View all <ArrowRight size={15} className="inline" /></Link></div><div className="scroll-snap-row flex snap-x gap-4 overflow-x-auto pb-3 sm:grid sm:grid-cols-2 lg:grid-cols-4">{items.map((product) => <div key={product.id} className="min-w-[72%] snap-start sm:min-w-0">{render(product)}</div>)}</div></div></section>; }
+function PromiseFeature({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) { return <div className="flex gap-3"><span className="text-sage-dark">{icon}</span><div><h3 className="font-medium">{title}</h3><p className="mt-1 text-sm text-ink/60">{text}</p></div></div>; }

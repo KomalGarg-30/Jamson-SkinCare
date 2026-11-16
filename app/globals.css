@@ -1,26 +1,37 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cream: #fbf9f5;
-  --color-sand: #f1ede5;
-  --color-sage: #788a73;
-  --color-sage-dark: #52654e;
-  --color-ink: #263027;
-  --color-rose: #bb8f80;
+  --color-cream: #faf8f5;
+  --color-sand: #f1ece4;
+  --color-sage: #6b7f6a;
+  --color-sage-dark: #536653;
+  --color-ink: #1f1f1f;
+  --color-rose: #a9796d;
   --font-sans: Arial, Helvetica, sans-serif;
   --font-serif: Georgia, "Times New Roman", serif;
 }
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { background: var(--color-cream); color: var(--color-ink); font-family: Arial, Helvetica, sans-serif; }
+body { background: var(--color-cream); color: var(--color-ink); font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
 a { transition: color .18s ease; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
+.focus-ring:focus-visible, a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid rgb(107 127 106 / .55); outline-offset: 3px; }
 .dropdown-link { display: block; border-radius: .6rem; padding: .65rem .75rem; font-size: .875rem; }
 .dropdown-link:hover { background: #f1ede5; }
 .container-page { margin-inline: auto; width: min(100% - 2.5rem, 80rem); }
 .field { width: 100%; border: 1px solid rgb(38 48 39 / .16); border-radius: .8rem; background: white; padding: .8rem 1rem; outline: none; }
 .field:focus { border-color: #788a73; box-shadow: 0 0 0 3px rgb(120 138 115 / .15); }
+.button-primary, .button-secondary { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: .5rem; border-radius: 999px; padding: .75rem 1.5rem; font-size: .875rem; font-weight: 500; }
+.button-primary { background: var(--color-sage-dark); color: white; }
+.button-primary:hover { background: var(--color-ink); }
+.button-secondary { border: 1px solid rgb(31 31 31 / .18); background: transparent; }
+.button-secondary:hover { border-color: var(--color-sage-dark); color: var(--color-sage-dark); }
+.eyebrow { color: var(--color-sage-dark); font-size: .7rem; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
 .admin-nav-link { display: flex; align-items: center; gap: .75rem; border-radius: .75rem; padding: .75rem 1rem; font-size: .9rem; color: rgb(38 48 39 / .72); }
 .admin-nav-link:hover, .admin-nav-link.active { background: #e8eee6; color: #52654e; }
+.scroll-snap-row { scrollbar-width: thin; scrollbar-color: #c8d0c5 transparent; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

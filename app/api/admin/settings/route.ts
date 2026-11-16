@@ -4,11 +4,20 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { errorResponse } from "@/lib/api";
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 
 const schema = z.object({
   store_name: z.string().trim().min(2).max(120),
   free_shipping_threshold: z.coerce.number().int().min(0),
   tax_percent: z.coerce.number().min(0).max(100),
+  homepage_headline: z.string().trim().max(160).optional(),
+  homepage_subheadline: z.string().trim().max(300).optional(),
+  homepage_primary_link: z.string().trim().max(300).optional(),
+  homepage_secondary_link: z.string().trim().max(300).optional(),
+  support_email: z.string().trim().email().optional().or(z.literal("")),
+  support_phone: z.string().trim().max(80).optional(),
+  business_address: z.string().trim().max(300).optional(),
+  announcement_text: z.string().trim().max(200).optional(),
 });
 
 export async function GET() {
@@ -32,6 +41,7 @@ export async function PUT(request: Request) {
         });
       }
     });
+    revalidatePath("/");
     return NextResponse.json({ settings: values });
   } catch (error) {
     return errorResponse(error);

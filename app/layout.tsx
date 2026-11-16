@@ -1,27 +1,15 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import "@/app/globals.css";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import { ToastProvider } from "@/components/toast-provider";
 
 export const metadata: Metadata = {
   title: { default: "Decotrin | Thoughtful care, every day", template: "%s | Decotrin" },
-  description: "Shop thoughtfully chosen skincare, haircare, bodycare and everyday wellness essentials.",
-  openGraph: { title: "Decotrin", description: "Thoughtful care, every day.", type: "website" },
+  description: "Thoughtfully chosen skincare, haircare, body care and wellness essentials for everyday rituals.",
+  openGraph: { title: "Decotrin", description: "Thoughtful care, every day.", type: "website", images: ["/images/skin-care.svg"] },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const storeName = process.env.STORE_NAME || "Decotrin";
-  return <html lang="en"><body>
-    <ToastProvider><SiteHeader /><main>{children}</main>
-      <footer className="mt-24 bg-ink px-6 py-14 text-white">
-        <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-3">
-          <div><Link href="/" className="font-serif text-3xl">{storeName}<span className="text-rose">.</span></Link><p className="mt-4 max-w-sm text-sm leading-6 text-white/65">Thoughtful essentials for the little rituals that make you feel good.</p></div>
-          <div><h3 className="font-medium">Explore</h3><div className="mt-4 grid gap-2 text-sm text-white/65"><Link href="/shop">Shop all</Link><Link href="/shop?category=skin-care">Skin care</Link><Link href="/shop?category=hair-care">Hair care</Link></div></div>
-          <div><h3 className="font-medium">We’re here to help</h3><p className="mt-4 text-sm leading-6 text-white/65">Questions about an order or product? Write to our care team and we’ll be happy to help.</p></div>
-        </div>
-        <div className="mx-auto mt-12 max-w-7xl border-t border-white/15 pt-5 text-xs text-white/50">© {new Date().getFullYear()} {storeName}. All rights reserved.</div>
-      </footer>
-    </ToastProvider>
-  </body></html>;
+  return <html lang="en"><body><ToastProvider><SiteHeader /><main>{children}</main><SiteFooter /></ToastProvider><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@graph": [{ "@type": "Organization", name: "Decotrin", url: process.env.NEXT_PUBLIC_APP_URL || "https://decotrin.com" }, { "@type": "WebSite", name: "Decotrin", url: process.env.NEXT_PUBLIC_APP_URL || "https://decotrin.com", potentialAction: { "@type": "SearchAction", target: `${process.env.NEXT_PUBLIC_APP_URL || "https://decotrin.com"}/shop?q={search_term_string}`, "query-input": "required name=search_term_string" } }] }) }} /></body></html>;
 }
